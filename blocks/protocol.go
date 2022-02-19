@@ -45,6 +45,7 @@ type I3barBlock struct {
 	Color      string `json:"color,omitempty"`
 	Background string `json:"background,omitempty"`
 	Border     string `json:"border,omitempty"`
+	BorderTop  string `json:"border_top,omitempty"`
 	// Omitted...
 	Name string `json:"name,omitempty"`
 	// Omitted...

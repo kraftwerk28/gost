@@ -8,6 +8,7 @@ import (
 	"path"
 	"plugin"
 
+	// "gopkg.in/yaml.v2"
 	blocks "i3bar-attempt/blocks"
 )
 
@@ -21,7 +22,7 @@ func createLogger() *logLib.Logger {
 	return logLib.New(f, "", logLib.Ldate|logLib.Ltime)
 }
 
-var pluggedBlocklets = []string{"time"}
+var pluggedBlocklets = []string{}
 
 func main() {
 	header := blocks.I3barHeader{Version: 1, ClickEvents: true}
@@ -31,8 +32,13 @@ func main() {
 
 	blocklets := []blocks.I3barBlocklet{
 		blocks.NewClickcountBlock(),
+		blocks.NewShellBlock(&blocks.ShellBlockConfig{
+			Command:        "while sleep 1; do date; done",
+			OnClickCommand: `echo "button: $button; x: $x; y: $y" >> $HOME/clicks.log`,
+		}),
 	}
-	pluginPath := "/home/kraftwerk28/projects/go/src/i3bar-attempt/contrib"
+	pluginPath := "/home/kraftwerk28/projects/go/src/i3bar-attempt/contrib/build"
+	// Load dynamic blocks
 	for _, pluginName := range pluggedBlocklets {
 		plug, err := plugin.Open(path.Join(pluginPath, pluginName+".so"))
 		if err != nil {
@@ -49,21 +55,18 @@ func main() {
 		}
 	}
 
-	aggregateUpdateChan := make(chan int)
+	updateChans := []blocks.UpdateChan{}
 	for _, blocklet := range blocklets {
 		if b, ok := blocklet.(blocks.I3barBlockletRun); ok {
 			go b.Run()
 		}
 		if b, ok := blocklet.(blocks.I3barBlockletAutoUpdater); ok {
-			c := b.UpdateChan()
-			go func() {
-				for {
-					v := <-c
-					aggregateUpdateChan <- v
-				}
-			}()
+			updateChans = append(updateChans, b.UpdateChan())
 		}
 	}
+	aggregateUpdateChan := blocks.CombineUpdateChans(updateChans)
+
+	stdinCloseChan := make(chan struct{})
 
 	// Read events from stdin
 	go func() {
@@ -87,7 +90,7 @@ func main() {
 				rendered := blocklet.Render()
 				for _, b := range rendered {
 					if ev.Name == b.Name {
-						bl.OnEvent(ev)
+						go bl.OnEvent(ev)
 					}
 				}
 			}
@@ -97,16 +100,24 @@ func main() {
 		} else {
 			log.Printf("Event stream exited")
 		}
+		stdinCloseChan <- struct{}{}
 	}()
 
 	for {
 		blocks := make([]blocks.I3barBlock, 0, len(blocklets))
 		for _, blocklet := range blocklets {
-			blocks = append(blocks, blocklet.Render()...)
+			b := blocklet.Render()
+			blocks = append(blocks, b...)
 		}
 		b, _ := json.Marshal(blocks)
 		b = append(b, []byte(",\n")...)
 		os.Stdout.Write(b)
-		<-aggregateUpdateChan
+		select {
+		case <-aggregateUpdateChan:
+			continue
+		case <-stdinCloseChan:
+			break
+		}
+		break
 	}
 }
