@@ -2,16 +2,20 @@ package main
 
 import (
 	"fmt"
-	blocks "i3bar-attempt/blocks"
 	"time"
+
+	core "github.com/kraftwerk28/gost/core"
 )
 
 type TimeBlock struct {
 	ch chan int
 }
 
-func NewBlock() blocks.I3barBlocklet {
+func NewBlock() core.I3barBlocklet {
 	return &TimeBlock{make(chan int)}
+}
+
+func (t *TimeBlock) GetConfig() interface{}{
 }
 
 func (t *TimeBlock) Run() {
@@ -22,13 +26,13 @@ func (t *TimeBlock) Run() {
 	}
 }
 
-func (t *TimeBlock) UpdateChan() blocks.UpdateChan {
-	return blocks.UpdateChan(t.ch)
+func (t *TimeBlock) UpdateChan() core.UpdateChan {
+	return core.UpdateChan(t.ch)
 }
 
-func (t *TimeBlock) Render() []blocks.I3barBlock {
+func (t *TimeBlock) Render() []core.I3barBlock {
 	currentTime := time.Now()
-	return []blocks.I3barBlock{{
+	return []core.I3barBlock{{
 		FullText: fmt.Sprintf(
 			"%d.%d %d:%d:%d",
 			currentTime.Day(),

@@ -1,4 +1,4 @@
-package blocks
+package core
 
 import (
 	"bytes"

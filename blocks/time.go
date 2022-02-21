@@ -3,14 +3,26 @@ package blocks
 import (
 	"fmt"
 	"time"
+
+	. "github.com/kraftwerk28/gost/core"
 )
 
+type TimeBlockConfig struct {
+	Zone     string `yaml:"zone"`
+	interval int
+}
+
 type TimeBlock struct {
+	*TimeBlockConfig
 	ch chan int
 }
 
 func NewTimeBlock() I3barBlocklet {
-	return &TimeBlock{make(chan int)}
+	return &TimeBlock{new(TimeBlockConfig), make(chan int)}
+}
+
+func (t *TimeBlock) GetConfig() interface{} {
+	return t.TimeBlockConfig
 }
 
 func (t *TimeBlock) Run() {
@@ -39,4 +51,8 @@ func (t *TimeBlock) Render() []I3barBlock {
 		// TODO: auto-assigned name
 		Name: "myclock",
 	}}
+}
+
+func init() {
+	RegisterBlocklet("time", NewTimeBlock)
 }

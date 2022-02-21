@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	. "github.com/kraftwerk28/gost/core"
 )
 
 type ShellBlockConfig struct {
@@ -22,6 +24,7 @@ type ShellBlock struct {
 func NewShellBlock(config *ShellBlockConfig) I3barBlocklet {
 	block := ShellBlock{}
 	block.Command = config.Command
+	block.OnClickCommand = config.OnClickCommand
 	block.ch = make(chan int)
 	return &block
 }
@@ -40,23 +43,25 @@ func (t *ShellBlock) UpdateChan() UpdateChan {
 func (t *ShellBlock) Run() {
 	cmd := exec.Command("sh", "-c", t.Command)
 	rc, err := cmd.StdoutPipe()
+	defer rc.Close()
 	if err != nil {
-		panic(err)
+		// TODO: per-block logger
+		Log.Print(err)
 	}
 	sc := bufio.NewScanner(rc)
 	if err := cmd.Start(); err != nil {
-		panic(err)
+		Log.Print(err)
 	}
 	for sc.Scan() {
 		t.lastText = sc.Text()
 		t.ch.SendUpdate()
 	}
 	if err := sc.Err(); err != nil {
-		panic(err)
+		Log.Println(err)
 	}
 }
 
-func (t *ShellBlock) OnEvent(e I3barClickEvent) {
+func (t *ShellBlock) OnEvent(e *I3barClickEvent) {
 	cmd := exec.Command("sh", "-c", t.OnClickCommand)
 	cmd.Env = append(
 		os.Environ(),
@@ -64,8 +69,11 @@ func (t *ShellBlock) OnEvent(e I3barClickEvent) {
 		fmt.Sprintf("x=%d", e.Button),
 		fmt.Sprintf("y=%d", e.Button),
 	)
+	cmd.Stdout = Log.Writer()
 	if err := cmd.Run(); err != nil {
-		panic(err)
+		Log.Println(err)
+	} else {
+		Log.Println("OnClickCommand exited.")
 	}
 }
 

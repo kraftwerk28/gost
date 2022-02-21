@@ -2,87 +2,122 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
-	logLib "log"
+	"errors"
+	"flag"
+	"io/ioutil"
 	"os"
 	"path"
-	"plugin"
 
-	// "gopkg.in/yaml.v2"
-	blocks "i3bar-attempt/blocks"
+	// "plugin"
+
+	_ "github.com/kraftwerk28/gost/blocks"
+	"github.com/kraftwerk28/gost/core"
+	"gopkg.in/yaml.v2"
 )
 
-var log = createLogger()
+var log = core.Log
 
-func createLogger() *logLib.Logger {
-	f, err := os.Create("i3barattempt.log")
+const PROGRAM_NAME = "gost"
+
+func main() {
+	core.InitializeLogger("/home/kraftwerk28/i3bar-attempt.log")
+
+	cfgPath := flag.String("config", "", "Path to config.yml")
+	flag.Parse()
+	if *cfgPath == "" {
+		xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
+		if !hasXdg {
+			home, _ := os.UserHomeDir()
+			xdg = path.Join(home, ".config")
+		}
+		*cfgPath = path.Join(xdg, PROGRAM_NAME, "config.yml")
+	}
+	if _, err := os.Stat(*cfgPath); err != nil {
+		panic(errors.New("Could not load config"))
+	}
+
+	programCtx := context.Background()
+	cancelCtx, cancelFunc := context.WithCancel(programCtx)
+	println(cancelCtx, cancelFunc)
+
+	configContents, err := ioutil.ReadFile(*cfgPath)
 	if err != nil {
 		panic(err)
 	}
-	return logLib.New(f, "", logLib.Ldate|logLib.Ltime)
-}
+	cfg := core.AppConfig{}
+	if err := yaml.Unmarshal(configContents, &cfg); err != nil {
+		panic(err)
+	}
 
-var pluggedBlocklets = []string{}
-
-func main() {
-	header := blocks.I3barHeader{Version: 1, ClickEvents: true}
+	header := core.I3barHeader{Version: 1, ClickEvents: true}
 	b, _ := json.Marshal(header)
 	b = append(b, []byte("\n[\n")...)
 	os.Stdout.Write(b)
 
-	blocklets := []blocks.I3barBlocklet{
-		blocks.NewClickcountBlock(),
-		blocks.NewShellBlock(&blocks.ShellBlockConfig{
-			Command:        "while sleep 1; do date; done",
-			OnClickCommand: `echo "button: $button; x: $x; y: $y" >> $HOME/clicks.log`,
-		}),
+	blocklets := make([]core.I3barBlocklet, len(cfg.Blocks))
+	// blocklets := []core.I3barBlocklet{
+	// 	blocks.NewClickcountBlock(),
+	// 	blocks.NewShellBlock(&blocks.ShellBlockConfig{
+	// 		Command:        `while :; do date; sleep 1; done`,
+	// 		OnClickCommand: `echo "button: $button; x: $x; y: $y"`,
+	// 	}),
+	// }
+	for i, bc := range cfg.Blocks {
+		blocklets[i] = bc.Blocklet
 	}
-	pluginPath := "/home/kraftwerk28/projects/go/src/i3bar-attempt/contrib/build"
+	// homedir, _ := os.UserHomeDir()
+	// pluginPath := path.Join(
+	// 	homedir,
+	// 	"projects/go/src/i3bar-attempt/contrib/build",
+	// )
 	// Load dynamic blocks
-	for _, pluginName := range pluggedBlocklets {
-		plug, err := plugin.Open(path.Join(pluginPath, pluginName+".so"))
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		sym, err := plug.Lookup("NewBlock")
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		if newfunc, ok := sym.(func() blocks.I3barBlocklet); ok {
-			blocklets = append(blocklets, newfunc())
-		}
-	}
+	// for _, pluginName := range pluggedBlocklets {
+	// 	plug, err := plugin.Open(path.Join(pluginPath, pluginName+".so"))
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		continue
+	// 	}
+	// 	sym, err := plug.Lookup("NewBlock")
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		continue
+	// 	}
+	// 	if loadFunc, ok := sym.(core.PluginLoadFunc); ok {
+	// 		blocklets = append(blocklets, loadFunc())
+	// 	}
+	// }
 
-	updateChans := []blocks.UpdateChan{}
+	updateChans := []core.UpdateChan{}
 	for _, blocklet := range blocklets {
-		if b, ok := blocklet.(blocks.I3barBlockletRun); ok {
+		if b, ok := blocklet.(core.I3barBlockletRunnable); ok {
 			go b.Run()
 		}
-		if b, ok := blocklet.(blocks.I3barBlockletAutoUpdater); ok {
+		if b, ok := blocklet.(core.I3barBlockletSelfUpdater); ok {
 			updateChans = append(updateChans, b.UpdateChan())
 		}
 	}
-	aggregateUpdateChan := blocks.CombineUpdateChans(updateChans)
+	aggregateUpdateChan := core.CombineUpdateChans(updateChans)
 
 	stdinCloseChan := make(chan struct{})
 
 	// Read events from stdin
 	go func() {
+		log := core.Log
 		sc := bufio.NewScanner(os.Stdin)
 		sc.Scan()
-		log.Println(sc.Text())
+		// log.Println(sc.Text())
 		for sc.Scan() {
 			raw := sc.Bytes()
-			ev, err := blocks.NewEventFromRaw(raw)
+			ev, err := core.NewEventFromRaw(raw)
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 			log.Printf("%+v\n", *ev)
 			for _, blocklet := range blocklets {
-				bl, ok := blocklet.(blocks.I3barBlockletListener)
+				bl, ok := blocklet.(core.I3barBlockletListener)
 				if !ok {
 					continue
 				}
@@ -104,7 +139,7 @@ func main() {
 	}()
 
 	for {
-		blocks := make([]blocks.I3barBlock, 0, len(blocklets))
+		blocks := make([]core.I3barBlock, 0, len(blocklets))
 		for _, blocklet := range blocklets {
 			b := blocklet.Render()
 			blocks = append(blocks, b...)
