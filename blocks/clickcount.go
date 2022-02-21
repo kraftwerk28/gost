@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"fmt"
+
 	. "github.com/kraftwerk28/gost/core"
 )
 

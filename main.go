@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,6 +9,7 @@ import (
 	"os"
 	"path"
 
+	// "context"
 	// "plugin"
 
 	_ "github.com/kraftwerk28/gost/blocks"
@@ -38,9 +38,9 @@ func main() {
 		panic(errors.New("Could not load config"))
 	}
 
-	programCtx := context.Background()
-	cancelCtx, cancelFunc := context.WithCancel(programCtx)
-	println(cancelCtx, cancelFunc)
+	// programCtx := context.Background()
+	// cancelCtx, cancelFunc := context.WithCancel(programCtx)
+	// println(cancelCtx, cancelFunc)
 
 	configContents, err := ioutil.ReadFile(*cfgPath)
 	if err != nil {
@@ -51,12 +51,17 @@ func main() {
 		panic(err)
 	}
 
+	managers := make([]core.BlockletMgr, len(cfg.Blocks))
+	for i, b := range cfg.Blocks {
+		managers[i] = core.MakeBlockletMgr(b)
+	}
+
 	header := core.I3barHeader{Version: 1, ClickEvents: true}
 	b, _ := json.Marshal(header)
 	b = append(b, []byte("\n[\n")...)
 	os.Stdout.Write(b)
 
-	blocklets := make([]core.I3barBlocklet, len(cfg.Blocks))
+	// blocklets := make([]core.I3barBlocklet, len(cfg.Blocks))
 	// blocklets := []core.I3barBlocklet{
 	// 	blocks.NewClickcountBlock(),
 	// 	blocks.NewShellBlock(&blocks.ShellBlockConfig{
@@ -64,9 +69,9 @@ func main() {
 	// 		OnClickCommand: `echo "button: $button; x: $x; y: $y"`,
 	// 	}),
 	// }
-	for i, bc := range cfg.Blocks {
-		blocklets[i] = bc.Blocklet
-	}
+	// for i, bc := range cfg.Blocks {
+	// 	blocklets[i] = bc.Blocklet
+	// }
 	// homedir, _ := os.UserHomeDir()
 	// pluginPath := path.Join(
 	// 	homedir,
@@ -90,18 +95,12 @@ func main() {
 	// }
 
 	updateChans := []core.UpdateChan{}
-	for _, blocklet := range blocklets {
-		if b, ok := blocklet.(core.I3barBlockletRunnable); ok {
-			go b.Run()
-		}
-		if b, ok := blocklet.(core.I3barBlockletSelfUpdater); ok {
-			updateChans = append(updateChans, b.UpdateChan())
-		}
+	for _, m := range managers {
+		m.Run()
+		updateChans = append(updateChans, m.UpdateChan())
 	}
 	aggregateUpdateChan := core.CombineUpdateChans(updateChans)
-
 	stdinCloseChan := make(chan struct{})
-
 	// Read events from stdin
 	go func() {
 		log := core.Log
@@ -115,19 +114,8 @@ func main() {
 				log.Println(err)
 				continue
 			}
-			log.Printf("%+v\n", *ev)
-			for _, blocklet := range blocklets {
-				bl, ok := blocklet.(core.I3barBlockletListener)
-				if !ok {
-					continue
-				}
-				// FIXME: avoid using .Render() to check block name
-				rendered := blocklet.Render()
-				for _, b := range rendered {
-					if ev.Name == b.Name {
-						go bl.OnEvent(ev)
-					}
-				}
+			for _, m := range managers {
+				m.ProcessEvent(ev)
 			}
 		}
 		if err := sc.Err(); err != nil {
@@ -139,10 +127,9 @@ func main() {
 	}()
 
 	for {
-		blocks := make([]core.I3barBlock, 0, len(blocklets))
-		for _, blocklet := range blocklets {
-			b := blocklet.Render()
-			blocks = append(blocks, b...)
+		blocks := make([]core.I3barBlock, 0)
+		for _, m := range managers {
+			blocks = append(blocks, m.Render()...)
 		}
 		b, _ := json.Marshal(blocks)
 		b = append(b, []byte(",\n")...)

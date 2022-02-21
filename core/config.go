@@ -6,6 +6,7 @@ import (
 )
 
 type BlockletConfig struct {
+	Name     string
 	Blocklet I3barBlocklet
 }
 
@@ -16,6 +17,7 @@ func (bc *BlockletConfig) UnmarshalYAML(unmarshal func(interface{}) error) error
 	if err := unmarshal(&nameOnly); err != nil {
 		return err
 	}
+	bc.Name = nameOnly.Name
 	// TODO: handle not defined block
 	ctor, bExists := Builtin[nameOnly.Name]
 	if !bExists {
