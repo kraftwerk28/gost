@@ -66,7 +66,7 @@ type BlockletMgr struct {
 	b    I3barBlocklet
 }
 
-func MakeBlockletMgr(cfg *BlockletConfig) BlockletMgr {
+func NewBlockletMgr(cfg *BlockletConfig) *BlockletMgr {
 	// Increment global names
 	name := cfg.Name
 	bm := BlockletMgr{
@@ -74,7 +74,7 @@ func MakeBlockletMgr(cfg *BlockletConfig) BlockletMgr {
 		cfg.Blocklet,
 	}
 	blockletCounters[name]++
-	return bm
+	return &bm
 }
 
 func (bm *BlockletMgr) Render() []I3barBlock {

@@ -6,9 +6,9 @@ blocks:
         echo "mylabel"
         sleep 2
       done
-  # - name: "time"
-  #   format: "..."
-  #   on_click: "..."
+  - name: "time"
+    # format: "..."
+    # on_click: "..."
   - name: "clicks"
     fmt: "[%d clicked]"
   - name: "shell"

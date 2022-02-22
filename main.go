@@ -69,9 +69,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	managers := make([]core.BlockletMgr, len(cfg.Blocks))
-	for i, b := range cfg.Blocks {
-		managers[i] = core.MakeBlockletMgr(b)
+	managers := make([]*core.BlockletMgr, len(cfg.Blocks))
+	for i := range cfg.Blocks {
+		managers[i] = core.NewBlockletMgr(cfg.Blocks[i])
 	}
 
 	header := core.I3barHeader{Version: 1, ClickEvents: true}
@@ -80,9 +80,13 @@ func main() {
 	os.Stdout.Write(b)
 
 	updateChans := []core.UpdateChan{}
+	listeners := make([]*core.BlockletMgr, 0, len(managers))
 	for _, m := range managers {
 		m.Run()
 		updateChans = append(updateChans, m.UpdateChan())
+		if m.IsListener() {
+			listeners = append(listeners, m)
+		}
 	}
 	aggregateUpdateChan := core.CombineUpdateChans(updateChans)
 	stdinCloseChan := make(chan struct{})
@@ -99,8 +103,8 @@ func main() {
 				log.Println(err)
 				continue
 			}
-			log.Printf("%+v\n", *ev)
-			for _, m := range managers {
+			log.Printf("%+v\n", ev)
+			for _, m := range listeners {
 				m.ProcessEvent(ev)
 			}
 		}

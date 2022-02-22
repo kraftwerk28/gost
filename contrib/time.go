@@ -15,10 +15,6 @@ func NewBlock() core.I3barBlocklet {
 	return &TimeBlock{make(chan int)}
 }
 
-func (t *TimeBlock) GetConfig() interface{} {
-	return nil
-}
-
 func (t *TimeBlock) Run() {
 	ticker := time.NewTicker(time.Second)
 	for {
