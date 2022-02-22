@@ -10,31 +10,26 @@ import (
 )
 
 type ShellBlockConfig struct {
-	Command        string
-	OnClickCommand string
-	ListenClicks   bool
+	Command        string `yaml:"command"`
+	OnClickCommand string `yaml:"on_click"`
 }
 
 type ShellBlock struct {
-	ShellBlockConfig
+	*ShellBlockConfig
 	lastText string
 	ch       UpdateChan
 }
 
-func NewShellBlock(config *ShellBlockConfig) I3barBlocklet {
-	block := ShellBlock{}
-	block.Command = config.Command
-	block.OnClickCommand = config.OnClickCommand
-	block.ch = make(chan int)
-	return &block
+func NewShellBlock() I3barBlocklet {
+	return &ShellBlock{
+		ShellBlockConfig: new(ShellBlockConfig),
+		ch:               make(chan int),
+	}
 }
 
-// func (t *ShellBlock) runCommand() {
-// 	cmd := exec.Command(t.Command[0], t.Command[1:]...)
-// 	cmd.Env = append(
-// 		os.Environ(),
-// 	)
-// }
+func (s *ShellBlock) GetConfig() interface{} {
+	return s.ShellBlockConfig
+}
 
 func (t *ShellBlock) UpdateChan() UpdateChan {
 	return t.ch
@@ -62,6 +57,9 @@ func (t *ShellBlock) Run() {
 }
 
 func (t *ShellBlock) OnEvent(e *I3barClickEvent) {
+	if t.OnClickCommand == "" {
+		return
+	}
 	cmd := exec.Command("sh", "-c", t.OnClickCommand)
 	cmd.Env = append(
 		os.Environ(),
@@ -86,4 +84,8 @@ func (t *ShellBlock) Render() []I3barBlock {
 		// TODO: auto-assigned name
 		Name: "shell",
 	}}
+}
+
+func init() {
+	RegisterBlocklet("shell", NewShellBlock)
 }

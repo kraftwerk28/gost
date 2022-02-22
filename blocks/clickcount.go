@@ -29,14 +29,18 @@ func (t *Clickcount) UpdateChan() UpdateChan {
 }
 
 func (t *Clickcount) Render() []I3barBlock {
-	return []I3barBlock{{
-		FullText: fmt.Sprintf(t.Fmt, t.clicks),
-		Name:     "myclickcount",
-	}}
+	return []I3barBlock{{FullText: fmt.Sprintf(t.Fmt, t.clicks)}}
 }
 
 func (t *Clickcount) OnEvent(e *I3barClickEvent) {
-	t.clicks++
+	if e.Button == ButtonScrollDown {
+		t.clicks--
+	} else {
+		t.clicks++
+	}
+	if t.clicks == 0 {
+		t.clicks = 0
+	}
 	t.ch <- 0
 }
 

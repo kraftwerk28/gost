@@ -106,8 +106,7 @@ func (bm *BlockletMgr) IsListener() bool {
 }
 
 func (bm *BlockletMgr) MatchesEvent(e *I3barClickEvent) bool {
-	baseName := e.Name[:strings.IndexRune(e.Name, ':')]
-	return baseName == bm.name
+	return strings.HasPrefix(e.Name, bm.name)
 }
 
 func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent) bool {
@@ -118,9 +117,4 @@ func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent) bool {
 		}
 	}
 	return false
-}
-
-func NewFromPluginName(name string) *BlockletMgr {
-	// TODO: get builtin blocklet by name
-	return &BlockletMgr{}
 }

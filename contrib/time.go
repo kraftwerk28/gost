@@ -15,7 +15,8 @@ func NewBlock() core.I3barBlocklet {
 	return &TimeBlock{make(chan int)}
 }
 
-func (t *TimeBlock) GetConfig() interface{}{
+func (t *TimeBlock) GetConfig() interface{} {
+	return nil
 }
 
 func (t *TimeBlock) Run() {
@@ -41,7 +42,5 @@ func (t *TimeBlock) Render() []core.I3barBlock {
 			currentTime.Minute(),
 			currentTime.Second(),
 		),
-		// TODO: auto-assigned name
-		Name: "myclock",
 	}}
 }

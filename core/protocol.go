@@ -5,6 +5,14 @@ import (
 	"encoding/json"
 )
 
+const (
+	ButtonLeft       int = 1
+	ButtonMiddle         = 3
+	ButtonRight          = 3
+	ButtonScrollUp       = 4
+	ButtonScrollDown     = 5
+)
+
 type I3barHeader struct {
 	Version     int  `json:"version"`
 	ClickEvents bool `json:"click_events,omitempty"`

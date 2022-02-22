@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -22,33 +23,50 @@ var log = core.Log
 const PROGRAM_NAME = "gost"
 
 func main() {
-	core.InitializeLogger("/home/kraftwerk28/i3bar-attempt.log")
-
-	cfgPath := flag.String("config", "", "Path to config.yml")
+	var cfgPath, logPath string
+	flag.StringVar(&cfgPath, "config", "", "Path to config.yml")
+	flag.StringVar(&logPath, "log", "", "Path to log file")
 	flag.Parse()
-	if *cfgPath == "" {
+
+	logOutput := io.Discard
+	if logPath != "" {
+		var err error
+		logOutput, err = os.OpenFile(
+			logPath,
+			os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+			0644,
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+	core.InitializeLogger(logOutput)
+	// Logger initialized at this point
+
+	if cfgPath == "" {
 		xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
 		if !hasXdg {
 			home, _ := os.UserHomeDir()
 			xdg = path.Join(home, ".config")
 		}
-		*cfgPath = path.Join(xdg, PROGRAM_NAME, "config.yml")
+		cfgPath = path.Join(xdg, PROGRAM_NAME, "config.yml")
 	}
-	if _, err := os.Stat(*cfgPath); err != nil {
-		panic(errors.New("Could not load config"))
+	if _, err := os.Stat(cfgPath); err != nil {
+		log.Fatal(errors.New("Could not load config"))
 	}
 
 	// programCtx := context.Background()
 	// cancelCtx, cancelFunc := context.WithCancel(programCtx)
 	// println(cancelCtx, cancelFunc)
 
-	configContents, err := ioutil.ReadFile(*cfgPath)
+	configContents, err := ioutil.ReadFile(cfgPath)
+	configContentsStr := os.ExpandEnv(string(configContents))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	cfg := core.AppConfig{}
-	if err := yaml.Unmarshal(configContents, &cfg); err != nil {
-		panic(err)
+	if err := yaml.Unmarshal([]byte(configContentsStr), &cfg); err != nil {
+		log.Fatal(err)
 	}
 
 	managers := make([]core.BlockletMgr, len(cfg.Blocks))
@@ -61,39 +79,6 @@ func main() {
 	b = append(b, []byte("\n[\n")...)
 	os.Stdout.Write(b)
 
-	// blocklets := make([]core.I3barBlocklet, len(cfg.Blocks))
-	// blocklets := []core.I3barBlocklet{
-	// 	blocks.NewClickcountBlock(),
-	// 	blocks.NewShellBlock(&blocks.ShellBlockConfig{
-	// 		Command:        `while :; do date; sleep 1; done`,
-	// 		OnClickCommand: `echo "button: $button; x: $x; y: $y"`,
-	// 	}),
-	// }
-	// for i, bc := range cfg.Blocks {
-	// 	blocklets[i] = bc.Blocklet
-	// }
-	// homedir, _ := os.UserHomeDir()
-	// pluginPath := path.Join(
-	// 	homedir,
-	// 	"projects/go/src/i3bar-attempt/contrib/build",
-	// )
-	// Load dynamic blocks
-	// for _, pluginName := range pluggedBlocklets {
-	// 	plug, err := plugin.Open(path.Join(pluginPath, pluginName+".so"))
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 		continue
-	// 	}
-	// 	sym, err := plug.Lookup("NewBlock")
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 		continue
-	// 	}
-	// 	if loadFunc, ok := sym.(core.PluginLoadFunc); ok {
-	// 		blocklets = append(blocklets, loadFunc())
-	// 	}
-	// }
-
 	updateChans := []core.UpdateChan{}
 	for _, m := range managers {
 		m.Run()
@@ -101,12 +86,12 @@ func main() {
 	}
 	aggregateUpdateChan := core.CombineUpdateChans(updateChans)
 	stdinCloseChan := make(chan struct{})
+
 	// Read events from stdin
 	go func() {
 		log := core.Log
 		sc := bufio.NewScanner(os.Stdin)
-		sc.Scan()
-		// log.Println(sc.Text())
+		sc.Scan() // Strip `[`
 		for sc.Scan() {
 			raw := sc.Bytes()
 			ev, err := core.NewEventFromRaw(raw)
@@ -114,14 +99,13 @@ func main() {
 				log.Println(err)
 				continue
 			}
+			log.Printf("%+v\n", *ev)
 			for _, m := range managers {
 				m.ProcessEvent(ev)
 			}
 		}
 		if err := sc.Err(); err != nil {
 			log.Fatal(err)
-		} else {
-			log.Printf("Event stream exited")
 		}
 		stdinCloseChan <- struct{}{}
 	}()
