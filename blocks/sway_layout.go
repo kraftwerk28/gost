@@ -16,9 +16,10 @@ type SwayLayoutConfig struct {
 
 type SwayLayout struct {
 	SwayLayoutConfig
-	layoutLongToShort map[string]string
-	currentLayout     string
-	ipc               *ipc.IpcClient
+	layoutLongToShort  map[string]string
+	layouts            []string
+	currentLayoutIndex int
+	ipc                *ipc.IpcClient
 }
 
 func NewSwayLayoutBlock() core.I3barBlocklet {
@@ -31,11 +32,13 @@ func (s *SwayLayout) GetConfig() interface{} {
 
 func (s *SwayLayout) Run(ch core.UpdateChan) {
 	ipcClient, _ := ipc.NewIpcClient()
+	s.ipc = ipcClient
 	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)
 	_, res, _ := ipcClient.Recv()
 	for _, device := range *res.(*[]ipc.IpcInputDevice) {
 		if device.Type == "keyboard" {
-			s.currentLayout = device.XkbActiveLayoutName
+			s.currentLayoutIndex = device.XkbActiveLayoutIndex
+			s.layouts = device.XkbLayoutNames
 			ch.SendUpdate()
 			break
 		}
@@ -44,8 +47,16 @@ func (s *SwayLayout) Run(ch core.UpdateChan) {
 	_, res, _ = ipcClient.Recv()
 	now := time.Now()
 	for {
-		_, res, _ = ipcClient.Recv()
-		s.currentLayout = res.(*ipc.InputChange).Input.XkbActiveLayoutName
+		t, res, _ := ipcClient.Recv()
+		if t != ipc.IpcEventTypeInput {
+			continue
+		}
+		device := res.(*ipc.InputChange).Input
+		if device.Type != "keyboard" {
+			continue
+		}
+		s.currentLayoutIndex = device.XkbActiveLayoutIndex
+		s.layouts = device.XkbLayoutNames
 		now2 := time.Now()
 		if now2.Sub(now).Milliseconds() < 1 {
 			continue
@@ -70,15 +81,25 @@ func countryFlagFromIsoCode(countryCode string) string {
 	return string([]byte{0xf0, 0x9f, 0x87, b1, 0xf0, 0x9f, 0x87, b2})
 }
 
+func (s *SwayLayout) OnEvent(e *core.I3barClickEvent) {
+	if e.Button == core.ButtonRight {
+		s.ipc.SendRaw(
+			ipc.IpcMsgTypeCommand,
+			[]byte(`input * xkb_switch_layout next`),
+		)
+	}
+}
+
 func (s *SwayLayout) Render() []core.I3barBlock {
-	if s.currentLayout == "" {
+	if s.layouts == nil {
 		return nil
 	}
 	f := formatting.GoFmt{}
-	shortName := s.layoutLongToShort[s.currentLayout]
+	currentLayout := s.layouts[s.currentLayoutIndex]
+	shortName := s.layoutLongToShort[currentLayout]
 	return []core.I3barBlock{{
 		FullText: f.Sprintf(s.Format, formatting.NamedArgs{
-			"long":  s.currentLayout,
+			"long":  currentLayout,
 			"short": shortName,
 			"flag":  countryFlagFromIsoCode(shortName),
 		}),

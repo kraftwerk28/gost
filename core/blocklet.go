@@ -64,7 +64,11 @@ func NewBlockletMgr(name string, b I3barBlocklet) *BlockletMgr {
 func (bm *BlockletMgr) Render() []I3barBlock {
 	blocks := bm.Blocklet.Render()
 	for i := range blocks {
-		blocks[i].Name = fmt.Sprintf("%s:%d", bm.Name, i)
+		if blocks[i].Name == "" {
+			blocks[i].Name = fmt.Sprintf("%s:%d", bm.Name, i)
+		} else {
+			blocks[i].Name = fmt.Sprintf("%s:%s", bm.Name, blocks[i].Name)
+		}
 	}
 	return blocks
 }

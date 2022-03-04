@@ -10,6 +10,7 @@ import (
 type IpcMsgType uint32
 
 const (
+	IpcMsgTypeCommand   IpcMsgType = 0
 	IpcMsgTypeSubscribe IpcMsgType = 2
 	IpcMsgTypeGetInputs IpcMsgType = 100
 	IpcEventTypeInput   IpcMsgType = 0x15
@@ -26,8 +27,10 @@ type IpcHeader struct {
 var ipcMagic = [6]byte{'i', '3', '-', 'i', 'p', 'c'}
 
 type IpcInputDevice struct {
-	Type                string `json:"type"`
-	XkbActiveLayoutName string `json:"xkb_active_layout_name"`
+	Type                 string   `json:"type"`
+	XkbActiveLayoutName  string   `json:"xkb_active_layout_name"`
+	XkbLayoutNames       []string `json:"xkb_layout_names"`
+	XkbActiveLayoutIndex int      `json:"xkb_active_layout_index"`
 }
 
 type IpcContainer struct {

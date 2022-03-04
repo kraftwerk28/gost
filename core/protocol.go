@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 )
 
 const (
@@ -31,6 +32,11 @@ type I3barClickEvent struct {
 	RelativeY int    `json:"relative_y"`
 	Width     int    `json:"width"`
 	Height    int    `json:"height"`
+}
+
+func (e *I3barClickEvent) CustomBlockletName() string {
+	i := strings.LastIndexByte(e.Name, ':')
+	return e.Name[i+1:]
 }
 
 func NewEventFromRaw(raw []byte) (*I3barClickEvent, error) {

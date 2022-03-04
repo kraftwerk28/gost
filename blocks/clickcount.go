@@ -12,7 +12,7 @@ type ClickcountConfig struct {
 
 type Clickcount struct {
 	*ClickcountConfig
-	ch     chan int
+	ch     UpdateChan
 	clicks uint
 }
 
@@ -28,10 +28,6 @@ func (c *Clickcount) GetConfig() interface{} {
 	return &c.ClickcountConfig
 }
 
-func (t *Clickcount) UpdateChan() UpdateChan {
-	return UpdateChan(t.ch)
-}
-
 func (t *Clickcount) Render() []I3barBlock {
 	return []I3barBlock{{FullText: fmt.Sprintf(t.Fmt, t.clicks)}}
 }
@@ -45,7 +41,7 @@ func (t *Clickcount) OnEvent(e *I3barClickEvent) {
 	if t.clicks == 0 {
 		t.clicks = 0
 	}
-	t.ch <- 0
+	t.ch.SendUpdate()
 }
 
 func init() {

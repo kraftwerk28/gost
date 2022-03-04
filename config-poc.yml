@@ -8,12 +8,15 @@ blocks:
   #       (( v++ ))
   #       sleep 2.5
   #     done
-  - name: time
-    zone: ua
+  # - name: time
+  #   zone: ua
   # - name: clicks
   #   fmt: "clicked %d times"
   - name: sway_layout
     format: "%{short} %{flag} "
-  - name: sway_window
+  # - name: sway_window
+  - name: pulseaudio
+    sink_format: "%{sink_icon} %{sink_volume}"
+    source_format: "%{source_icon} %{source_volume}"
   # - name: plugin
   #   path: "/home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so"
