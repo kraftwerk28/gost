@@ -3,22 +3,17 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"flag"
-	"io"
-	"io/ioutil"
 	"os"
+	"os/signal"
 	"path"
-
-	// "context"
-	// "plugin"
+	"plugin"
+	"syscall"
 
 	_ "github.com/kraftwerk28/gost/blocks"
 	"github.com/kraftwerk28/gost/core"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
-
-var log = core.Log
 
 const PROGRAM_NAME = "gost"
 
@@ -28,7 +23,7 @@ func main() {
 	flag.StringVar(&logPath, "log", "", "Path to log file")
 	flag.Parse()
 
-	logOutput := io.Discard
+	logOutput := os.Stderr
 	if logPath != "" {
 		var err error
 		logOutput, err = os.OpenFile(
@@ -42,6 +37,7 @@ func main() {
 	}
 	core.InitializeLogger(logOutput)
 	// Logger initialized at this point
+	log := core.Log
 
 	if cfgPath == "" {
 		xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
@@ -52,44 +48,78 @@ func main() {
 		cfgPath = path.Join(xdg, PROGRAM_NAME, "config.yml")
 	}
 	if _, err := os.Stat(cfgPath); err != nil {
-		log.Fatal(errors.New("Could not load config"))
+		log.Fatalln("Could not load config")
 	}
 
 	// programCtx := context.Background()
 	// cancelCtx, cancelFunc := context.WithCancel(programCtx)
 	// println(cancelCtx, cancelFunc)
 
-	configContents, err := ioutil.ReadFile(cfgPath)
-	configContentsStr := os.ExpandEnv(string(configContents))
+	cfgFile, err := os.Open(cfgPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := core.AppConfig{}
-	if err := yaml.Unmarshal([]byte(configContentsStr), &cfg); err != nil {
+	defer cfgFile.Close()
+	cfgDecoder := yaml.NewDecoder(cfgFile)
+	cfg := &core.AppConfig{}
+	if err := cfgDecoder.Decode(cfg); err != nil {
 		log.Fatal(err)
 	}
 
-	managers := make([]*core.BlockletMgr, len(cfg.Blocks))
-	for i := range cfg.Blocks {
-		managers[i] = core.NewBlockletMgr(cfg.Blocks[i])
+	managers := make([]*core.BlockletMgr, 0, len(cfg.Blocks))
+	for _, c := range cfg.Blocks {
+		var ctor core.I3barBlockletCtor
+		if c.Name == "plugin" {
+			handle, err := plugin.Open(c.Path)
+			if err != nil {
+				log.Println("Failed to load plugin:")
+				log.Print(err)
+			}
+			sym, err := handle.Lookup("NewBlock")
+			if err != nil {
+				log.Println("Plugin must have `func NewBlock() I3barBlocklet`:")
+				log.Print(err)
+				continue
+			}
+			if c, ok := sym.(*core.I3barBlockletCtor); ok {
+				ctor = *c
+			} else {
+				log.Println("Bad constructor")
+				continue
+			}
+		} else if ct, ok := core.Builtin[c.Name]; ok {
+			ctor = ct
+		} else {
+			log.Fatalf(`Unrecognized blocklet name: "%s"`, c.Name)
+		}
+		blocklet := ctor()
+		if b, ok := blocklet.(core.I3barBlockletConfigurable); ok {
+			cf, _ := yaml.Marshal(c)
+			if err := yaml.Unmarshal(cf, b.GetConfig()); err != nil {
+				log.Fatal(err)
+			}
+		}
+		managers = append(managers, core.NewBlockletMgr(c.Name, blocklet))
 	}
 
+	updateChan := make(core.UpdateChan)
 	header := core.I3barHeader{Version: 1, ClickEvents: true}
 	b, _ := json.Marshal(header)
 	b = append(b, []byte("\n[\n")...)
 	os.Stdout.Write(b)
-
-	updateChans := []core.UpdateChan{}
 	listeners := make([]*core.BlockletMgr, 0, len(managers))
 	for _, m := range managers {
-		m.Run()
-		updateChans = append(updateChans, m.UpdateChan())
+		m.Run(updateChan)
 		if m.IsListener() {
 			listeners = append(listeners, m)
 		}
 	}
-	aggregateUpdateChan := core.CombineUpdateChans(updateChans)
-	stdinCloseChan := make(chan struct{})
+
+	sigContChan, sigStopChan := make(chan os.Signal), make(chan os.Signal)
+	sigTermChan := make(chan os.Signal)
+	signal.Notify(sigContChan, syscall.SIGCONT)
+	signal.Notify(sigStopChan, syscall.SIGSTOP)
+	signal.Notify(sigTermChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Read events from stdin
 	go func() {
@@ -103,7 +133,7 @@ func main() {
 				log.Println(err)
 				continue
 			}
-			log.Printf("%+v\n", ev)
+			log.Printf("Click event: %+v\n", *ev)
 			for _, m := range listeners {
 				m.ProcessEvent(ev)
 			}
@@ -111,7 +141,6 @@ func main() {
 		if err := sc.Err(); err != nil {
 			log.Fatal(err)
 		}
-		stdinCloseChan <- struct{}{}
 	}()
 
 	for {
@@ -123,9 +152,9 @@ func main() {
 		b = append(b, []byte(",\n")...)
 		os.Stdout.Write(b)
 		select {
-		case <-aggregateUpdateChan:
+		case <-updateChan:
 			continue
-		case <-stdinCloseChan:
+		case <-sigTermChan:
 			break
 		}
 		break

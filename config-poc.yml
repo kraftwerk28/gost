@@ -1,37 +1,19 @@
-version: "1"
+version: "3"
 blocks:
-  - name: "shell"
-    command: >
-      while :; do
-        echo "mylabel"
-        sleep 2
-      done
-  - name: "time"
-    # format: "..."
-    # on_click: "..."
-  - name: "clicks"
-    fmt: "[%d clicked]"
-  - name: "shell"
-    command: >
-      while :; do
-        date
-        sleep 5
-      done
-  # - name: "custom"
-  #   script: "~/myscript.sh"
-  #   interval: 10
-  #   clicks:
-  #     - buttons: [left, right]
-  #       script: |
-  #         echo left or right was clicked at "$x, $y"
-  # - name: "custom"
-  #   script: "~/myscript-continuous.sh"
-  #   interval: "persist" # TODO: change
-  # - name: "custom"
-  #   script: "~/myscript-continuous.sh"
-  #   interval: "repeat" # TODO: change
-  # - name: "plugin"
-  #   file: "https://url/with/plugin.so"
-  #   plugin_specific_setting: 42
-  # - name: "plugin"
-  #   file: "/path/to/local/plugin.so"
+  # - name: shell
+  #   command: |
+  #     v=0
+  #     while :; do
+  #       echo "value: $v"
+  #       (( v++ ))
+  #       sleep 2.5
+  #     done
+  - name: time
+    zone: ua
+  # - name: clicks
+  #   fmt: "clicked %d times"
+  - name: sway_layout
+    format: "%{short} %{flag} "
+  - name: sway_window
+  # - name: plugin
+  #   path: "/home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so"

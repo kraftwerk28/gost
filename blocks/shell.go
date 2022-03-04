@@ -17,25 +17,17 @@ type ShellBlockConfig struct {
 type ShellBlock struct {
 	*ShellBlockConfig
 	lastText string
-	ch       UpdateChan
 }
 
 func NewShellBlock() I3barBlocklet {
-	return &ShellBlock{
-		ShellBlockConfig: new(ShellBlockConfig),
-		ch:               make(chan int),
-	}
+	return &ShellBlock{ShellBlockConfig: new(ShellBlockConfig)}
 }
 
 func (s *ShellBlock) GetConfig() interface{} {
-	return s.ShellBlockConfig
+	return &s.ShellBlockConfig
 }
 
-func (t *ShellBlock) UpdateChan() UpdateChan {
-	return t.ch
-}
-
-func (t *ShellBlock) Run() {
+func (t *ShellBlock) Run(ch UpdateChan) {
 	cmd := exec.Command("sh", "-c", t.Command)
 	rc, err := cmd.StdoutPipe()
 	defer rc.Close()
@@ -49,7 +41,7 @@ func (t *ShellBlock) Run() {
 	}
 	for sc.Scan() {
 		t.lastText = sc.Text()
-		t.ch.SendUpdate()
+		ch.SendUpdate()
 	}
 	if err := sc.Err(); err != nil {
 		Log.Println(err)

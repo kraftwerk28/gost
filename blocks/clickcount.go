@@ -17,11 +17,15 @@ type Clickcount struct {
 }
 
 func NewClickcountBlock() I3barBlocklet {
-	return &Clickcount{new(ClickcountConfig), make(chan int), 0}
+	return &Clickcount{nil, make(chan int), 0}
+}
+
+func (c *Clickcount) Run(ch UpdateChan) {
+	c.ch = ch
 }
 
 func (c *Clickcount) GetConfig() interface{} {
-	return c.ClickcountConfig
+	return &c.ClickcountConfig
 }
 
 func (t *Clickcount) UpdateChan() UpdateChan {

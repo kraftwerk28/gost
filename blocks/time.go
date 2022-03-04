@@ -13,28 +13,23 @@ type TimeBlockConfig struct {
 }
 
 type TimeBlock struct {
-	*TimeBlockConfig
-	ch chan int
+	TimeBlockConfig
 }
 
 func NewTimeBlock() I3barBlocklet {
-	return &TimeBlock{new(TimeBlockConfig), make(chan int)}
+	return &TimeBlock{}
 }
 
 func (t *TimeBlock) GetConfig() interface{} {
-	return t.TimeBlockConfig
+	return &t.TimeBlockConfig
 }
 
-func (t *TimeBlock) Run() {
-	ticker := time.NewTicker(time.Second)
+func (t *TimeBlock) Run(ch UpdateChan) {
+	ti := time.Tick(time.Second)
 	for {
-		<-ticker.C
-		t.ch <- 0
+		<-ti
+		ch.SendUpdate()
 	}
-}
-
-func (t *TimeBlock) UpdateChan() UpdateChan {
-	return UpdateChan(t.ch)
 }
 
 func (t *TimeBlock) Render() []I3barBlock {
