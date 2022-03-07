@@ -1,6 +1,8 @@
 package blocks
 
 import (
+	"context"
+
 	"github.com/kraftwerk28/gost/blocks/ipc"
 	. "github.com/kraftwerk28/gost/core"
 )
@@ -20,7 +22,7 @@ func NewSwayWindow() I3barBlocklet {
 // 	return nil
 // }
 
-func (t *SwayWindow) Run(ch UpdateChan) {
+func (t *SwayWindow) Run(ch UpdateChan, ctx context.Context) {
 	client, _ := ipc.NewIpcClient()
 	client.SendRaw(ipc.IpcMsgTypeSubscribe, []byte(`["window"]`))
 	client.Recv()

@@ -15,8 +15,12 @@ blocks:
   - name: sway_layout
     format: "%{short} %{flag} "
   # - name: sway_window
-  - name: pulseaudio
-    sink_format: "%{sink_icon} %{sink_volume}"
-    source_format: "%{source_icon} %{source_volume}"
+  # - name: pulseaudio
+  #   sink_format: "%{sink_icon} %{sink_volume}"
+  #   source_format: "%{source_icon} %{source_volume}"
+  - name: battery
+    device: battery_BAT0
+  - name: battery
+    device: keyboard_hid_dco2co26o0co73o0b_battery
   # - name: plugin
   #   path: "/home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"os"
@@ -51,9 +52,9 @@ func main() {
 		log.Fatalln("Could not load config")
 	}
 
-	// programCtx := context.Background()
-	// cancelCtx, cancelFunc := context.WithCancel(programCtx)
-	// println(cancelCtx, cancelFunc)
+	programCtx := context.Background()
+	cancelCtx, _ := context.WithCancel(programCtx)
+	// TODO: implement hot reloading by using context
 
 	cfgFile, err := os.Open(cfgPath)
 	if err != nil {
@@ -99,7 +100,8 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		managers = append(managers, core.NewBlockletMgr(c.Name, blocklet))
+		m := core.NewBlockletMgr(c.Name, blocklet, cancelCtx)
+		managers = append(managers, m)
 	}
 
 	updateChan := make(core.UpdateChan)

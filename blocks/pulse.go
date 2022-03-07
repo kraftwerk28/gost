@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"context"
 	"math"
 	"time"
 
@@ -112,7 +113,7 @@ func (c *PulseBlock) getCurrentSource() (*pulseaudio.Source, error) {
 	return nil, nil
 }
 
-func (c *PulseBlock) Run(ch UpdateChan) {
+func (c *PulseBlock) Run(ch UpdateChan, ctx context.Context) {
 	client, _ := pulseaudio.NewClient()
 	c.client = client
 	upd, _ := client.Updates()

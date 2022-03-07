@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ func (s *SwayLayout) GetConfig() interface{} {
 	return &s.SwayLayoutConfig
 }
 
-func (s *SwayLayout) Run(ch core.UpdateChan) {
+func (s *SwayLayout) Run(ch core.UpdateChan, ctx context.Context) {
 	ipcClient, _ := ipc.NewIpcClient()
 	s.ipc = ipcClient
 	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)

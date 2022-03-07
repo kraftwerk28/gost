@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,7 +28,7 @@ func (s *ShellBlock) GetConfig() interface{} {
 	return &s.ShellBlockConfig
 }
 
-func (t *ShellBlock) Run(ch UpdateChan) {
+func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 	cmd := exec.Command("sh", "-c", t.Command)
 	rc, err := cmd.StdoutPipe()
 	defer rc.Close()

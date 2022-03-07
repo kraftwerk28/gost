@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/kraftwerk28/gost/core"
@@ -20,7 +21,7 @@ func NewClickcountBlock() I3barBlocklet {
 	return &Clickcount{nil, make(chan int), 0}
 }
 
-func (c *Clickcount) Run(ch UpdateChan) {
+func (c *Clickcount) Run(ch UpdateChan, ctx context.Context) {
 	c.ch = ch
 }
 

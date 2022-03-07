@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,7 +25,7 @@ func (t *TimeBlock) GetConfig() interface{} {
 	return &t.TimeBlockConfig
 }
 
-func (t *TimeBlock) Run(ch UpdateChan) {
+func (t *TimeBlock) Run(ch UpdateChan, ctx context.Context) {
 	ti := time.Tick(time.Second)
 	for {
 		<-ti
