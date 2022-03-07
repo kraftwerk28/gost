@@ -11,6 +11,7 @@ type RustLikeFmt struct{}
 
 type fmtPlaceholder struct {
 	name                          string
+	minWidthZero                  bool
 	minWidth, maxWidth            int
 	minPrefix                     string
 	hideMinPrefix, minPrefixSpace bool
@@ -19,17 +20,18 @@ type fmtPlaceholder struct {
 	barMaxValue                   int
 }
 
-var rustFmtRe = regexp.MustCompile(`(?:^|[^{])\{(\w+)(?::(\d+))?(?:\^(\d+))?(?:;( )?(_)?([num1KMGT]))?(?:\*(_)?([\w%]+))?(?:#(\d+))?\}`)
+var rustFmtRe = regexp.MustCompile(`(?:^|[^{])\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?(?:;( )?(_)?([num1KMGT]))?(?:\*(_)?([\w%]+))?(?:#(\d+))?\}`)
 
 // 2  3  name
-// 4  5  min width
-// 6  7  max width
-// 8  9  min prefix space
-// 10 11 min prefix underscore
-// 12 13 min prefix
-// 14 15 unit underscore
-// 16 17 unit
+// 4  5  min width zero
+// 6  7  min width
+// 8  9  max width
+// 10 11 min prefix space
+// 12 13 min prefix underscore
+// 14 15 min prefix
+// 16 17 unit underscore
 // 18 19 unit
+// 20 21 unit
 
 // {<name>[:[0]<min width>][^<max width>][;[ ][_]<min prefix>][*[_]<unit>][#<bar max value>]}
 // (?:^|[^{])\{(\w+)(?::(\d+))?(?:\^(\d+))?\}
@@ -41,41 +43,46 @@ func parse(fstr string) ([]string, []fmtPlaceholder) {
 	for _, m := range rustFmtRe.FindAllStringSubmatchIndex(fstr, -1) {
 		name := fstr[m[2]:m[3]]
 		var minWidth, maxWidth int
-		if m[4] == -1 {
-			minWidth = -1
-		} else {
-			minWidth, _ = strconv.Atoi(fstr[m[4]:m[5]])
+		minWidthZero := false
+		if m[4] != -1 {
+			minWidthZero = true
 		}
 		if m[6] == -1 {
+			minWidth = -1
+		} else {
+			minWidth, _ = strconv.Atoi(fstr[m[6]:m[7]])
+		}
+		if m[8] == -1 {
 			maxWidth = -1
 		} else {
-			maxWidth, _ = strconv.Atoi(fstr[m[6]:m[7]])
+			maxWidth, _ = strconv.Atoi(fstr[m[8]:m[9]])
 		}
 		minPrefix := "1"
-		if m[12] != -1 {
-			minPrefix = fstr[m[12]:m[13]]
+		if m[14] != -1 {
+			minPrefix = fstr[m[14]:m[15]]
 		}
 		hideMinPrefix, minPrefixSpace := false, false
-		if m[10] != -1 {
+		if m[12] != -1 {
 			hideMinPrefix = true
 		}
-		if m[8] != -1 {
+		if m[10] != -1 {
 			minPrefixSpace = true
 		}
 		unit := ""
-		if m[16] != -1 {
-			unit = fstr[m[16]:m[17]]
+		if m[18] != -1 {
+			unit = fstr[m[18]:m[19]]
 		}
 		hideUnit := false
-		if m[14] != -1 {
+		if m[16] != -1 {
 			hideUnit = true
 		}
 		barMaxValue := -1
-		if m[18] != -1 {
-			barMaxValue, _ = strconv.Atoi(fstr[m[18]:m[19]])
+		if m[20] != -1 {
+			barMaxValue, _ = strconv.Atoi(fstr[m[20]:m[21]])
 		}
 		p := fmtPlaceholder{
 			name,
+			minWidthZero,
 			minWidth, maxWidth,
 			minPrefix,
 			hideMinPrefix, minPrefixSpace,
