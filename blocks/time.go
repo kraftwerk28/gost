@@ -6,11 +6,13 @@ import (
 	"time"
 
 	. "github.com/kraftwerk28/gost/core"
+	"github.com/kraftwerk28/gost/core/formatting"
 )
 
 type TimeBlockConfig struct {
-	Zone     string `yaml:"zone"`
-	interval int
+	Format   *ConfigFormat   `yaml:"format"`
+	Layout   string          `yaml:"layout"`
+	Interval *ConfigInterval `yaml:"interval"`
 }
 
 type TimeBlock struct {
@@ -18,7 +20,13 @@ type TimeBlock struct {
 }
 
 func NewTimeBlock() I3barBlocklet {
-	return &TimeBlock{}
+	defInterval := ConfigInterval(time.Second)
+	defaultFmt := ConfigFormat{*formatting.NewFromString("{layout}")}
+	return &TimeBlock{TimeBlockConfig{
+		Interval: &defInterval,
+		Layout:   time.RFC1123,
+		Format:   &defaultFmt,
+	}}
 }
 
 func (t *TimeBlock) GetConfig() interface{} {
@@ -26,26 +34,31 @@ func (t *TimeBlock) GetConfig() interface{} {
 }
 
 func (t *TimeBlock) Run(ch UpdateChan, ctx context.Context) {
-	ti := time.Tick(time.Second)
+	ti := time.Tick(time.Duration(*t.Interval))
 	for {
-		<-ti
-		ch.SendUpdate()
+		select {
+		case <-ti:
+			ch.SendUpdate()
+		case <-ctx.Done():
+			break
+		}
 	}
 }
 
 func (t *TimeBlock) Render() []I3barBlock {
 	currentTime := time.Now()
 	return []I3barBlock{{
-		FullText: fmt.Sprintf(
-			"%d.%d %d:%d:%d",
-			currentTime.Day(),
-			currentTime.Month(),
-			currentTime.Hour(),
-			currentTime.Minute(),
-			currentTime.Second(),
-		),
-		// TODO: auto-assigned name
-		Name: "myclock",
+		FullText: t.Format.Expand(formatting.NamedArgs{
+			"time": fmt.Sprintf(
+				"%d.%d %d:%d:%d",
+				currentTime.Day(),
+				currentTime.Month(),
+				currentTime.Hour(),
+				currentTime.Minute(),
+				currentTime.Second(),
+			),
+			"layout": currentTime.Format(t.Layout),
+		}),
 	}}
 }
 

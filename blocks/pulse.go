@@ -11,8 +11,8 @@ import (
 )
 
 type PulseConfig struct {
-	SinkFormat   string `yaml:"sink_format"`
-	SourceFormat string `yaml:"source_format"`
+	SinkFormat   *ConfigFormat `yaml:"sink_format"`
+	SourceFormat *ConfigFormat `yaml:"source_format"`
 }
 
 type NodeInfo struct {
@@ -135,17 +135,16 @@ func (c *PulseBlock) GetConfig() interface{} {
 }
 
 func (t *PulseBlock) Render() []I3barBlock {
-	f := formatting.GoFmt{}
 	return []I3barBlock{
 		{
-			FullText: f.Sprintf(t.SinkFormat, formatting.NamedArgs{
+			FullText: t.SinkFormat.Expand(formatting.NamedArgs{
 				"sink_icon":   t.sink.Icon,
 				"sink_volume": t.sink.Volume,
 			}),
 			Name: "sink",
 		},
 		{
-			FullText: f.Sprintf(t.SourceFormat, formatting.NamedArgs{
+			FullText: t.SourceFormat.Expand(formatting.NamedArgs{
 				"source_icon":   t.source.Icon,
 				"source_volume": t.source.Volume,
 			}),
@@ -154,7 +153,7 @@ func (t *PulseBlock) Render() []I3barBlock {
 	}
 }
 
-func (t *PulseBlock) OnEvent(e *I3barClickEvent) {
+func (t *PulseBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	n := e.CustomBlockletName()
 	switch n {
 	case "sink":

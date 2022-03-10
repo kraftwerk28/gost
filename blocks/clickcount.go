@@ -5,20 +5,21 @@ import (
 	"fmt"
 
 	. "github.com/kraftwerk28/gost/core"
+	"github.com/kraftwerk28/gost/core/formatting"
 )
 
 type ClickcountConfig struct {
-	Fmt string `yaml:"fmt"`
+	Format *ConfigFormat `yaml:"format"`
 }
 
 type Clickcount struct {
-	*ClickcountConfig
-	ch     UpdateChan
+	ClickcountConfig
 	clicks uint
+	ch     UpdateChan
 }
 
 func NewClickcountBlock() I3barBlocklet {
-	return &Clickcount{nil, make(chan int), 0}
+	return &Clickcount{}
 }
 
 func (c *Clickcount) Run(ch UpdateChan, ctx context.Context) {
@@ -30,10 +31,13 @@ func (c *Clickcount) GetConfig() interface{} {
 }
 
 func (t *Clickcount) Render() []I3barBlock {
-	return []I3barBlock{{FullText: fmt.Sprintf(t.Fmt, t.clicks)}}
+	txt := t.Format.Expand(formatting.NamedArgs{
+		"clicks": fmt.Sprintf("%d", t.clicks),
+	})
+	return []I3barBlock{{FullText: txt}}
 }
 
-func (t *Clickcount) OnEvent(e *I3barClickEvent) {
+func (t *Clickcount) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	if e.Button == ButtonScrollDown {
 		t.clicks--
 	} else {

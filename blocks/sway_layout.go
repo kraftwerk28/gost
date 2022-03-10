@@ -7,12 +7,12 @@ import (
 
 	"github.com/kraftwerk28/gost/blocks/ipc"
 	"github.com/kraftwerk28/gost/blocks/rxkbcommon"
-	"github.com/kraftwerk28/gost/core"
+	. "github.com/kraftwerk28/gost/core"
 	"github.com/kraftwerk28/gost/core/formatting"
 )
 
 type SwayLayoutConfig struct {
-	Format string `yaml:"format"`
+	Format *ConfigFormat `yaml:"format"`
 }
 
 type SwayLayout struct {
@@ -23,7 +23,7 @@ type SwayLayout struct {
 	ipc                *ipc.IpcClient
 }
 
-func NewSwayLayoutBlock() core.I3barBlocklet {
+func NewSwayLayoutBlock() I3barBlocklet {
 	return &SwayLayout{layoutLongToShort: rxkbcommon.GetLayoutShortNames()}
 }
 
@@ -31,7 +31,7 @@ func (s *SwayLayout) GetConfig() interface{} {
 	return &s.SwayLayoutConfig
 }
 
-func (s *SwayLayout) Run(ch core.UpdateChan, ctx context.Context) {
+func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 	ipcClient, _ := ipc.NewIpcClient()
 	s.ipc = ipcClient
 	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)
@@ -82,8 +82,8 @@ func countryFlagFromIsoCode(countryCode string) string {
 	return string([]byte{0xf0, 0x9f, 0x87, b1, 0xf0, 0x9f, 0x87, b2})
 }
 
-func (s *SwayLayout) OnEvent(e *core.I3barClickEvent) {
-	if e.Button == core.ButtonRight {
+func (s *SwayLayout) OnEvent(e *I3barClickEvent, ctx context.Context) {
+	if e.Button == ButtonRight {
 		s.ipc.SendRaw(
 			ipc.IpcMsgTypeCommand,
 			[]byte(`input * xkb_switch_layout next`),
@@ -91,15 +91,14 @@ func (s *SwayLayout) OnEvent(e *core.I3barClickEvent) {
 	}
 }
 
-func (s *SwayLayout) Render() []core.I3barBlock {
+func (s *SwayLayout) Render() []I3barBlock {
 	if s.layouts == nil {
 		return nil
 	}
-	f := formatting.GoFmt{}
 	currentLayout := s.layouts[s.currentLayoutIndex]
 	shortName := s.layoutLongToShort[currentLayout]
-	return []core.I3barBlock{{
-		FullText: f.Sprintf(s.Format, formatting.NamedArgs{
+	return []I3barBlock{{
+		FullText: s.Format.Expand(formatting.NamedArgs{
 			"long":  currentLayout,
 			"short": shortName,
 			"flag":  countryFlagFromIsoCode(shortName),
@@ -108,5 +107,5 @@ func (s *SwayLayout) Render() []core.I3barBlock {
 }
 
 func init() {
-	core.RegisterBlocklet("sway_layout", NewSwayLayoutBlock)
+	RegisterBlocklet("sway_layout", NewSwayLayoutBlock)
 }

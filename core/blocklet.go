@@ -1,6 +1,9 @@
 package core
 
-import "context"
+import (
+	"context"
+	"log"
+)
 
 type UpdateChan chan int
 
@@ -18,20 +21,6 @@ func (u UpdateChan) SendUpdate() {
 	u <- 0
 }
 
-// Deprecated
-// func CombineUpdateChans(chans []UpdateChan) UpdateChan {
-// 	ch := UpdateChan(make(chan int))
-// 	for i := range chans {
-// 		go func(c UpdateChan) {
-// 			for {
-// 				v := <-c
-// 				ch <- v
-// 			}
-// 		}(chans[i])
-// 	}
-// 	return ch
-// }
-
 type I3barBlocklet interface {
 	Run(ch UpdateChan, ctx context.Context)
 	Render() []I3barBlock
@@ -44,5 +33,10 @@ type I3barBlockletConfigurable interface {
 
 type I3barBlockletListener interface {
 	I3barBlocklet
-	OnEvent(*I3barClickEvent)
+	OnEvent(*I3barClickEvent, context.Context)
+}
+
+type I3barBlockletLogger interface {
+	I3barBlocklet
+	GetLogger() *log.Logger
 }

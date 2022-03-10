@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -23,6 +24,13 @@ func NewBlockletMgr(name string, b I3barBlocklet, ctx context.Context) *Blocklet
 	return &bm
 }
 
+func (bm *BlockletMgr) initLogger() {
+	if logb, ok := bm.Blocklet.(I3barBlockletLogger); ok {
+		prefix := Log.Prefix() + ":" + bm.Name
+		*logb.GetLogger() = *log.New(Log.Writer(), prefix, Log.Flags())
+	}
+}
+
 func (bm *BlockletMgr) Render() []I3barBlock {
 	blocks := bm.Blocklet.Render()
 	for i := range blocks {
@@ -36,6 +44,7 @@ func (bm *BlockletMgr) Render() []I3barBlock {
 }
 
 func (bm *BlockletMgr) Run(ch UpdateChan) {
+	bm.initLogger()
 	go bm.Blocklet.Run(ch, bm.Ctx)
 }
 
@@ -46,14 +55,14 @@ func (bm *BlockletMgr) IsListener() bool {
 	return false
 }
 
-func (bm *BlockletMgr) MatchesEvent(e *I3barClickEvent) bool {
+func (bm *BlockletMgr) matchesEvent(e *I3barClickEvent) bool {
 	return strings.HasPrefix(e.Name, bm.Name)
 }
 
 func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent) bool {
-	if bm.MatchesEvent(e) {
+	if bm.matchesEvent(e) {
 		if b, ok := bm.Blocklet.(I3barBlockletListener); ok {
-			b.OnEvent(e)
+			b.OnEvent(e, bm.Ctx)
 			return true
 		}
 	}

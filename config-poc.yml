@@ -1,26 +1,30 @@
 version: "3"
 blocks:
-  # - name: shell
-  #   command: |
-  #     v=0
-  #     while :; do
-  #       echo "value: $v"
-  #       (( v++ ))
-  #       sleep 2.5
-  #     done
+  - name: shell
+    command: |
+      date
+      sleep 1
+      # v=0
+      # while :; do
+      #   echo "[value = $(( v++ ))]"
+      #   sleep 1
+      # done
+    restart_on_exit: true
   # - name: time
-  #   zone: ua
   # - name: clicks
-  #   fmt: "clicked %d times"
-  - name: sway_layout
-    format: "%{short} %{flag} "
+  #   format: "clicked {clicks} times"
+  # - name: sway_layout
+  #   format: "{short} {flag} "
+  # - name: dbus
+  #   object_path: /bar
+  #   initial_text: bar
   # - name: sway_window
   # - name: pulseaudio
-  #   sink_format: "%{sink_icon} %{sink_volume}"
-  #   source_format: "%{source_icon} %{source_volume}"
-  - name: battery
-    device: battery_BAT0
-  - name: battery
-    device: keyboard_hid_dco2co26o0co73o0b_battery
+  #   sink_format: "{sink_icon} {sink_volume}"
+  #   source_format: "{source_icon} {source_volume}"
+  # - name: battery
+  #   device: battery_BAT0
+  # - name: battery
+  #   device: keyboard_hid_dco2co26o0co73o0b_battery
   # - name: plugin
   #   path: "/home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so"

@@ -1,24 +1,12 @@
 package formatting
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
-
-type RustLikeFmt struct{}
-
-type fmtPlaceholder struct {
-	name                          string
-	minWidthZero                  bool
-	minWidth, maxWidth            int
-	minPrefix                     string
-	hideMinPrefix, minPrefixSpace bool
-	unit                          string
-	hideUnit                      bool
-	barMaxValue                   int
-}
 
 var rustFmtRe = regexp.MustCompile(`(?:^|[^{])\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?(?:;( )?(_)?([num1KMGT]))?(?:\*(_)?([\w%]+))?(?:#(\d+))?\}`)
 
@@ -35,6 +23,63 @@ var rustFmtRe = regexp.MustCompile(`(?:^|[^{])\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?
 
 // {<name>[:[0]<min width>][^<max width>][;[ ][_]<min prefix>][*[_]<unit>][#<bar max value>]}
 // (?:^|[^{])\{(\w+)(?::(\d+))?(?:\^(\d+))?\}
+
+type RustLikeFmt struct {
+	rawParts     []string
+	placeholders []fmtPlaceholder
+}
+
+type fmtPlaceholder struct {
+	name                          string
+	minWidthZero                  bool
+	minWidth, maxWidth            int
+	minPrefix                     string
+	hideMinPrefix, minPrefixSpace bool
+	unit                          string
+	hideUnit                      bool
+	barMaxValue                   int
+}
+
+func NewFromString(v string) *RustLikeFmt {
+	parts, placeholders := parse(v)
+	return &RustLikeFmt{parts, placeholders}
+}
+
+func (f *RustLikeFmt) UnmarshalYAML(node *yaml.Node) error {
+	var raw string
+	if err := node.Decode(&raw); err != nil {
+		return err
+	}
+	f.rawParts, f.placeholders = parse(raw)
+	return nil
+}
+
+func (f *RustLikeFmt) Expand(args NamedArgs) string {
+	b := strings.Builder{}
+	i := 0
+	for ; i < len(f.placeholders); i++ {
+		b.Write([]byte(f.rawParts[i]))
+		b.Write([]byte(args[f.placeholders[i].name].(string)))
+	}
+	b.Write([]byte(f.rawParts[i]))
+	return b.String()
+}
+
+func (p *fmtPlaceholder) format(value interface{}) string {
+	r := value.(string)
+	if p.minWidth > -1 && len(r) < p.minWidth {
+		fill := " "
+		if p.minWidthZero {
+			fill = "0"
+		}
+		r = strings.Repeat(fill, p.minWidth-len(r)) + r
+	}
+	if p.maxWidth > -1 && len(r) > p.maxWidth {
+		r = r[:p.maxWidth]
+	}
+	// TODO: check for rest specifiers...
+	return r
+}
 
 func parse(fstr string) ([]string, []fmtPlaceholder) {
 	rawParts := []string{}
@@ -100,19 +145,4 @@ func parse(fstr string) ([]string, []fmtPlaceholder) {
 	}
 	rawParts = append(rawParts, fstr[lastIndex:])
 	return rawParts, placeholders
-}
-
-func (f *RustLikeFmt) Sprintf(fstr string, args NamedArgs) string {
-	b := strings.Builder{}
-	rawParts, placeholders := parse(fstr)
-	for _, p := range placeholders {
-		fmt.Printf("%+v\n", p)
-	}
-	i := 0
-	for ; i < len(placeholders); i++ {
-		b.Write([]byte(rawParts[i]))
-		b.Write([]byte(args[placeholders[i].name].(string)))
-	}
-	b.Write([]byte(rawParts[i]))
-	return b.String()
 }
