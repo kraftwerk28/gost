@@ -64,3 +64,7 @@ type AppConfig struct {
 type ConfigFormat struct {
 	formatting.RustLikeFmt
 }
+
+func NewConfigFormatFromString(s string) *ConfigFormat {
+	return &ConfigFormat{*formatting.NewFromString(s)}
+}

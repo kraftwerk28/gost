@@ -9,62 +9,75 @@ import (
 
 // A helper wrapper around a blocklet
 type BlockletMgr struct {
-	Name     string
-	Blocklet I3barBlocklet
-	Ctx      context.Context
+	name        string
+	blocklet    I3barBlocklet
+	ctx         context.Context
+	renderCache []I3barBlock
 }
 
 func NewBlockletMgr(name string, b I3barBlocklet, ctx context.Context) *BlockletMgr {
-	bm := BlockletMgr{
-		Name:     fmt.Sprintf("%s:%d", name, blockletCounters[name]),
-		Blocklet: b,
-		Ctx:      ctx,
-	}
+	bmName := fmt.Sprintf("%s:%d", name, blockletCounters[name])
+	bm := BlockletMgr{name: bmName, blocklet: b, ctx: ctx}
 	blockletCounters[name]++
 	return &bm
 }
 
+func (bm *BlockletMgr) invalidateCache() {
+	blocks := bm.blocklet.Render()
+	for i := range blocks {
+		if blocks[i].Name == "" {
+			blocks[i].Name = fmt.Sprintf("%s:%d", bm.name, i)
+		} else {
+			blocks[i].Name = fmt.Sprintf("%s:%s", bm.name, blocks[i].Name)
+		}
+	}
+	bm.renderCache = blocks
+}
+
+func (bm *BlockletMgr) Render() []I3barBlock {
+	if bm.renderCache == nil {
+		bm.invalidateCache()
+	}
+	return bm.renderCache
+}
+
 func (bm *BlockletMgr) initLogger() {
-	if logb, ok := bm.Blocklet.(I3barBlockletLogger); ok {
-		prefix := Log.Prefix() + ":" + bm.Name
+	if logb, ok := bm.blocklet.(I3barBlockletLogger); ok {
+		prefix := Log.Prefix() + ":" + bm.name
 		*logb.GetLogger() = *log.New(Log.Writer(), prefix, Log.Flags())
 	}
 }
 
-func (bm *BlockletMgr) Render() []I3barBlock {
-	blocks := bm.Blocklet.Render()
-	for i := range blocks {
-		if blocks[i].Name == "" {
-			blocks[i].Name = fmt.Sprintf("%s:%d", bm.Name, i)
-		} else {
-			blocks[i].Name = fmt.Sprintf("%s:%s", bm.Name, blocks[i].Name)
-		}
-	}
-	return blocks
-}
-
-func (bm *BlockletMgr) Run(ch UpdateChan) {
+func (bm *BlockletMgr) Run(ch chan string) {
 	bm.initLogger()
-	go bm.Blocklet.Run(ch, bm.Ctx)
+	uc := UpdateChan{ch, bm.name}
+	go bm.blocklet.Run(uc, bm.ctx)
 }
 
 func (bm *BlockletMgr) IsListener() bool {
-	if _, ok := bm.Blocklet.(I3barBlockletListener); ok {
+	if _, ok := bm.blocklet.(I3barBlockletListener); ok {
 		return true
 	}
 	return false
 }
 
 func (bm *BlockletMgr) matchesEvent(e *I3barClickEvent) bool {
-	return strings.HasPrefix(e.Name, bm.Name)
+	return strings.HasPrefix(e.Name, bm.name)
 }
 
 func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent) bool {
 	if bm.matchesEvent(e) {
-		if b, ok := bm.Blocklet.(I3barBlockletListener); ok {
-			b.OnEvent(e, bm.Ctx)
+		if b, ok := bm.blocklet.(I3barBlockletListener); ok {
+			b.OnEvent(e, bm.ctx)
 			return true
 		}
 	}
 	return false
+}
+
+// If name matches blocklet manager name, re-render blocklets
+func (bm *BlockletMgr) TryInvalidate(name string) {
+	if name == bm.name {
+		bm.invalidateCache()
+	}
 }

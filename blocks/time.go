@@ -21,11 +21,11 @@ type TimeBlock struct {
 
 func NewTimeBlock() I3barBlocklet {
 	defInterval := ConfigInterval(time.Second)
-	defaultFmt := ConfigFormat{*formatting.NewFromString("{layout}")}
+	defaultFmt := NewConfigFormatFromString("{layout}")
 	return &TimeBlock{TimeBlockConfig{
 		Interval: &defInterval,
 		Layout:   time.RFC1123,
-		Format:   &defaultFmt,
+		Format:   defaultFmt,
 	}}
 }
 

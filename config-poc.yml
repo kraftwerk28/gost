@@ -2,14 +2,14 @@ version: "3"
 blocks:
   - name: shell
     command: |
-      date
-      sleep 1
-      # v=0
-      # while :; do
-      #   echo "[value = $(( v++ ))]"
-      #   sleep 1
-      # done
-    restart_on_exit: true
+      v=0
+      while :; do
+        echo "value = $((v++))"
+        sleep 3
+      done
+  - name: shell
+    command: ~/.config/waybar/weather.py
+    interval: 5s
   # - name: time
   # - name: clicks
   #   format: "clicked {clicks} times"

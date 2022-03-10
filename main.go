@@ -16,7 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const PROGRAM_NAME = "gost"
+const programName = "gost"
+const configFileName = "config.yml"
+
+func getConfigPath() string {
+	xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
+	if !hasXdg {
+		home, _ := os.UserHomeDir()
+		xdg = path.Join(home, ".config")
+	}
+	return path.Join(xdg, programName, configFileName)
+}
 
 func main() {
 	var cfgPath, logPath string
@@ -41,15 +51,10 @@ func main() {
 	log := core.Log
 
 	if cfgPath == "" {
-		xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
-		if !hasXdg {
-			home, _ := os.UserHomeDir()
-			xdg = path.Join(home, ".config")
-		}
-		cfgPath = path.Join(xdg, PROGRAM_NAME, "config.yml")
+		cfgPath = getConfigPath()
 	}
 	if _, err := os.Stat(cfgPath); err != nil {
-		log.Fatalln("Could not load config")
+		log.Fatal(err)
 	}
 
 	programCtx := context.Background()
@@ -88,7 +93,7 @@ func main() {
 				log.Println("Bad constructor")
 				continue
 			}
-		} else if ct, ok := core.Builtin[c.Name]; ok {
+		} else if ct := core.GetBuiltin(c.Name); ct != nil {
 			ctor = ct
 		} else {
 			log.Fatalf(`Unrecognized blocklet name: "%s"`, c.Name)
@@ -104,12 +109,18 @@ func main() {
 		managers = append(managers, m)
 	}
 
-	updateChan := make(core.UpdateChan)
-	header := core.I3barHeader{Version: 1, ClickEvents: true}
-	b, _ := json.Marshal(header)
-	b = append(b, []byte("\n[\n")...)
-	os.Stdout.Write(b)
+	{
+		header := core.I3barHeader{
+			Version:     1,
+			ClickEvents: true,
+		}
+		b, _ := json.Marshal(header)
+		b = append(b, []byte("\n[\n")...)
+		os.Stdout.Write(b)
+	}
+
 	listeners := make([]*core.BlockletMgr, 0, len(managers))
+	updateChan := make(chan string)
 	for _, m := range managers {
 		m.Run(updateChan)
 		if m.IsListener() {
@@ -117,11 +128,12 @@ func main() {
 		}
 	}
 
-	sigContChan, sigStopChan := make(chan os.Signal), make(chan os.Signal)
-	sigTermChan := make(chan os.Signal)
-	signal.Notify(sigContChan, syscall.SIGCONT)
-	signal.Notify(sigStopChan, syscall.SIGSTOP)
-	signal.Notify(sigTermChan, syscall.SIGINT, syscall.SIGTERM)
+	signalChan := make(chan os.Signal)
+	signal.Notify(
+		signalChan,
+		syscall.SIGCONT, syscall.SIGSTOP,
+		syscall.SIGUSR2, syscall.SIGTERM,
+	)
 
 	// Read events from stdin
 	go func() {
@@ -145,20 +157,33 @@ func main() {
 		}
 	}()
 
+loop:
 	for {
 		blocks := make([]core.I3barBlock, 0)
 		for _, m := range managers {
 			blocks = append(blocks, m.Render()...)
 		}
 		b, _ := json.Marshal(blocks)
-		b = append(b, []byte(",\n")...)
+		b = append(b, ',', '\n')
 		os.Stdout.Write(b)
 		select {
-		case <-updateChan:
-			continue
-		case <-sigTermChan:
-			break
+		case updateData := <-updateChan:
+			for i := range managers {
+				managers[i].TryInvalidate(updateData)
+			}
+		case signal := <-signalChan:
+			switch signal {
+			case syscall.SIGUSR2:
+				// Reload bar
+				break
+			case syscall.SIGSTOP:
+				// Stop emitting JSON
+			case syscall.SIGCONT:
+				// Continue emitting JSON
+			case syscall.SIGTERM, syscall.SIGINT:
+				break loop
+			}
 		}
-		break
 	}
+	core.Log.Println("\nBye.")
 }

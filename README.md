@@ -1,2 +1,8 @@
 # gost
-i3wm/sway bar json feeder
+
+### i3wm/sway bar json feeder
+
+
+## Documentation
+
+TBD...

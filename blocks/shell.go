@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	. "github.com/kraftwerk28/gost/core"
@@ -45,6 +46,10 @@ func (t *ShellBlock) newCmd(ctx context.Context) *exec.Cmd {
 	return exec.CommandContext(ctx, "sh", "-c", t.Command)
 }
 
+func postProcessCmdOutput(o []byte) string {
+	return strings.TrimSpace(string(o))
+}
+
 func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 	if t.RestartOnExit {
 		for {
@@ -54,7 +59,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 				Log.Print(err)
 				break
 			}
-			t.lastText = string(outp)
+			t.lastText = postProcessCmdOutput(outp)
 			ch.SendUpdate()
 		}
 	} else if t.Interval != nil {
@@ -63,7 +68,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 		for {
 			cmd := t.newCmd(ctx)
 			outp, _ := cmd.Output()
-			t.lastText = string(outp)
+			t.lastText = postProcessCmdOutput(outp)
 			ch.SendUpdate()
 			select {
 			case <-ticker:
@@ -85,7 +90,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 			Log.Print(err)
 		}
 		for sc.Scan() {
-			t.lastText = sc.Text()
+			t.lastText = postProcessCmdOutput(sc.Bytes())
 			ch.SendUpdate()
 		}
 		if err := sc.Err(); err != nil {

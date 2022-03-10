@@ -5,20 +5,26 @@ import (
 	"log"
 )
 
-type UpdateChan chan int
+type UpdateChan struct {
+	ch   chan string
+	name string
+}
+
+func (u *UpdateChan) SendUpdate() {
+	u.ch <- u.name
+}
 
 type I3barBlockletCtor func() I3barBlocklet
 
-var Builtin = map[string]I3barBlockletCtor{}
+var builtin = map[string]I3barBlockletCtor{}
 var blockletCounters = map[string]int{}
 
 func RegisterBlocklet(name string, ctor I3barBlockletCtor) {
-	Builtin[name] = ctor
+	builtin[name] = ctor
 }
 
-func (u UpdateChan) SendUpdate() {
-	// TODO: send some more information, not just integer
-	u <- 0
+func GetBuiltin(name string) I3barBlockletCtor {
+	return builtin[name]
 }
 
 type I3barBlocklet interface {
