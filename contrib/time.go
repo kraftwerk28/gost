@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,14 +11,18 @@ import (
 type TimeBlock struct{}
 
 func NewBlock() core.I3barBlocklet {
-	return new(TimeBlock)
+	return &TimeBlock{}
 }
 
-func (t *TimeBlock) Run(ch core.UpdateChan) {
-	ticker := time.Tick(time.Second * 4)
+func (t *TimeBlock) Run(ch core.UpdateChan, ctx context.Context) {
+	ticker := time.Tick(time.Second)
 	for {
-		<-ticker
-		ch <- 0
+		select {
+		case <-ticker:
+			ch.SendUpdate()
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 

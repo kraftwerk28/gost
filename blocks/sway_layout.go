@@ -2,7 +2,6 @@ package blocks
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/kraftwerk28/gost/blocks/ipc"
@@ -33,7 +32,12 @@ func (s *SwayLayout) GetConfig() interface{} {
 
 func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 	ipcClient, _ := ipc.NewIpcClient()
+	go func() {
+		<-ctx.Done()
+		ipcClient.Close()
+	}()
 	s.ipc = ipcClient
+	var err error
 	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)
 	_, res, _ := ipcClient.Recv()
 	for _, device := range *res.(*[]ipc.IpcInputDevice) {
@@ -45,10 +49,15 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 		}
 	}
 	ipcClient.SendRaw(ipc.IpcMsgTypeSubscribe, []byte(`["input"]`))
-	_, res, _ = ipcClient.Recv()
+	if _, res, err = ipcClient.Recv(); err != nil {
+		return
+	}
 	now := time.Now()
 	for {
-		t, res, _ := ipcClient.Recv()
+		t, res, err := ipcClient.Recv()
+		if err != nil {
+			return
+		}
 		if t != ipc.IpcEventTypeInput {
 			continue
 		}
@@ -65,21 +74,6 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 		now = now2
 		ch.SendUpdate()
 	}
-}
-
-func countryFlagFromIsoCode(countryCode string) string {
-	if len(countryCode) != 2 {
-		return countryCode
-	}
-	b := []byte(strings.ToUpper(countryCode))
-	// Each char is encoded as 1F1E6 to 1F1FF for A-Z
-	c1, c2 := b[0]+0xa5, b[1]+0xa5
-	// The last byte will always start with 101 (0xa0) and then the 5 least
-	// significant bits from the previous result
-	b1 := 0xa0 | (c1 & 0x1f)
-	b2 := 0xa0 | (c2 & 0x1f)
-	// Get the flag string from the UTF-8 representation of our Unicode characters.
-	return string([]byte{0xf0, 0x9f, 0x87, b1, 0xf0, 0x9f, 0x87, b2})
 }
 
 func (s *SwayLayout) OnEvent(e *I3barClickEvent, ctx context.Context) {
@@ -101,7 +95,7 @@ func (s *SwayLayout) Render() []I3barBlock {
 		FullText: s.Format.Expand(formatting.NamedArgs{
 			"long":  currentLayout,
 			"short": shortName,
-			"flag":  countryFlagFromIsoCode(shortName),
+			"flag":  CountryFlagFromIsoCode(shortName),
 		}),
 	}}
 }

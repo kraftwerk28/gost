@@ -5,19 +5,20 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 )
 
 // A helper wrapper around a blocklet
+// TODO: utilize `instance` field, as defined in the i3bar protocol
 type BlockletMgr struct {
 	name        string
 	blocklet    I3barBlocklet
-	ctx         context.Context
 	renderCache []I3barBlock
 }
 
 func NewBlockletMgr(name string, b I3barBlocklet, ctx context.Context) *BlockletMgr {
 	bmName := fmt.Sprintf("%s:%d", name, blockletCounters[name])
-	bm := BlockletMgr{name: bmName, blocklet: b, ctx: ctx}
+	bm := BlockletMgr{name: bmName, blocklet: b}
 	blockletCounters[name]++
 	return &bm
 }
@@ -30,6 +31,7 @@ func (bm *BlockletMgr) invalidateCache() {
 		} else {
 			blocks[i].Name = fmt.Sprintf("%s:%s", bm.name, blocks[i].Name)
 		}
+		blocks[i].Separator = true
 	}
 	bm.renderCache = blocks
 }
@@ -48,10 +50,11 @@ func (bm *BlockletMgr) initLogger() {
 	}
 }
 
-func (bm *BlockletMgr) Run(ch chan string) {
+func (bm *BlockletMgr) Run(ch chan string, ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	bm.initLogger()
 	uc := UpdateChan{ch, bm.name}
-	go bm.blocklet.Run(uc, bm.ctx)
+	bm.blocklet.Run(uc, ctx)
 }
 
 func (bm *BlockletMgr) IsListener() bool {
@@ -65,10 +68,10 @@ func (bm *BlockletMgr) matchesEvent(e *I3barClickEvent) bool {
 	return strings.HasPrefix(e.Name, bm.name)
 }
 
-func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent) bool {
+func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent, ctx context.Context) bool {
 	if bm.matchesEvent(e) {
 		if b, ok := bm.blocklet.(I3barBlockletListener); ok {
-			b.OnEvent(e, bm.ctx)
+			b.OnEvent(e, ctx)
 			return true
 		}
 	}

@@ -36,11 +36,13 @@ func (o *busObject) SetStatus(text string) *dbus.Error {
 
 func (b *DbusBlock) Run(ch UpdateChan, ctx context.Context) {
 	b.text = b.InitialText
+	ch.SendUpdate()
 	conn, err := dbus.SessionBus()
 	if err != nil {
 		Log.Println(err)
 		return
 	}
+	defer conn.Close()
 	dbusObject := &busObject{b, ch}
 	if err := conn.Export(
 		dbusObject,

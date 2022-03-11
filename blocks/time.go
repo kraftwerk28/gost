@@ -24,7 +24,7 @@ func NewTimeBlock() I3barBlocklet {
 	defaultFmt := NewConfigFormatFromString("{layout}")
 	return &TimeBlock{TimeBlockConfig{
 		Interval: &defInterval,
-		Layout:   time.RFC1123,
+		Layout:   "Mon 02.01.2006 15:04:05",
 		Format:   defaultFmt,
 	}}
 }
@@ -40,7 +40,7 @@ func (t *TimeBlock) Run(ch UpdateChan, ctx context.Context) {
 		case <-ti:
 			ch.SendUpdate()
 		case <-ctx.Done():
-			break
+			return
 		}
 	}
 }

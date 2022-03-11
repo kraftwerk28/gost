@@ -5,15 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"io"
 	"os"
 	"os/signal"
 	"path"
-	"plugin"
+	"sync"
 	"syscall"
 
 	_ "github.com/kraftwerk28/gost/blocks"
 	"github.com/kraftwerk28/gost/core"
-	"gopkg.in/yaml.v3"
 )
 
 const programName = "gost"
@@ -28,86 +28,64 @@ func getConfigPath() string {
 	return path.Join(xdg, programName, configFileName)
 }
 
+func readEvents(ch chan *core.I3barClickEvent) {
+	log := core.Log
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Scan() // Skip "["
+	for sc.Scan() {
+		raw := sc.Bytes()
+		ev, err := core.NewEventFromRaw(raw)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		log.Printf("Click event: %+v\n", *ev)
+		ch <- ev
+	}
+	if err := sc.Err(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func feedBlocks(o io.Writer, blocks []core.I3barBlock) error {
+	b, _ := json.Marshal(blocks)
+	b = append(b, ',', '\n')
+	_, err := os.Stdout.Write(b)
+	return err
+}
+
+func wgWaitWithSignal(wg *sync.WaitGroup, ch chan os.Signal) {
+	wg.Wait()
+}
+
 func main() {
 	var cfgPath, logPath string
+	var err error
 	flag.StringVar(&cfgPath, "config", "", "Path to config.yml")
 	flag.StringVar(&logPath, "log", "", "Path to log file")
 	flag.Parse()
 
-	logOutput := os.Stderr
+	signalChan := make(chan os.Signal)
+	signal.Notify(
+		signalChan,
+		syscall.SIGCONT, syscall.SIGSTOP, // defined by protocol
+		syscall.SIGUSR2,                 // reload config
+		syscall.SIGTERM, syscall.SIGINT, // exit
+	)
+
+	logWriter := os.Stderr
 	if logPath != "" {
-		var err error
-		logOutput, err = os.OpenFile(
+		if logWriter, err = os.OpenFile(
 			logPath,
 			os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
 			0644,
-		)
-		if err != nil {
+		); err != nil {
 			panic(err)
 		}
 	}
-	core.InitializeLogger(logOutput)
+	core.InitializeLogger(logWriter)
 	// Logger initialized at this point
 	log := core.Log
-
-	if cfgPath == "" {
-		cfgPath = getConfigPath()
-	}
-	if _, err := os.Stat(cfgPath); err != nil {
-		log.Fatal(err)
-	}
-
-	programCtx := context.Background()
-	cancelCtx, _ := context.WithCancel(programCtx)
-	// TODO: implement hot reloading by using context
-
-	cfgFile, err := os.Open(cfgPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer cfgFile.Close()
-	cfgDecoder := yaml.NewDecoder(cfgFile)
-	cfg := &core.AppConfig{}
-	if err := cfgDecoder.Decode(cfg); err != nil {
-		log.Fatal(err)
-	}
-
-	managers := make([]*core.BlockletMgr, 0, len(cfg.Blocks))
-	for _, c := range cfg.Blocks {
-		var ctor core.I3barBlockletCtor
-		if c.Name == "plugin" {
-			handle, err := plugin.Open(c.Path)
-			if err != nil {
-				log.Println("Failed to load plugin:")
-				log.Print(err)
-			}
-			sym, err := handle.Lookup("NewBlock")
-			if err != nil {
-				log.Println("Plugin must have `func NewBlock() I3barBlocklet`:")
-				log.Print(err)
-				continue
-			}
-			if c, ok := sym.(*core.I3barBlockletCtor); ok {
-				ctor = *c
-			} else {
-				log.Println("Bad constructor")
-				continue
-			}
-		} else if ct := core.GetBuiltin(c.Name); ct != nil {
-			ctor = ct
-		} else {
-			log.Fatalf(`Unrecognized blocklet name: "%s"`, c.Name)
-		}
-		blocklet := ctor()
-		if b, ok := blocklet.(core.I3barBlockletConfigurable); ok {
-			cf, _ := yaml.Marshal(c)
-			if err := yaml.Unmarshal(cf, b.GetConfig()); err != nil {
-				log.Fatal(err)
-			}
-		}
-		m := core.NewBlockletMgr(c.Name, blocklet, cancelCtx)
-		managers = append(managers, m)
-	}
 
 	{
 		header := core.I3barHeader{
@@ -119,71 +97,91 @@ func main() {
 		os.Stdout.Write(b)
 	}
 
-	listeners := make([]*core.BlockletMgr, 0, len(managers))
-	updateChan := make(chan string)
-	for _, m := range managers {
-		m.Run(updateChan)
-		if m.IsListener() {
-			listeners = append(listeners, m)
-		}
-	}
+	eventChan := make(chan *core.I3barClickEvent)
+	go readEvents(eventChan)
 
-	signalChan := make(chan os.Signal)
-	signal.Notify(
-		signalChan,
-		syscall.SIGCONT, syscall.SIGSTOP,
-		syscall.SIGUSR2, syscall.SIGTERM,
-	)
-
-	// Read events from stdin
-	go func() {
-		log := core.Log
-		sc := bufio.NewScanner(os.Stdin)
-		sc.Scan() // Strip `[`
-		for sc.Scan() {
-			raw := sc.Bytes()
-			ev, err := core.NewEventFromRaw(raw)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			log.Printf("Click event: %+v\n", *ev)
-			for _, m := range listeners {
-				m.ProcessEvent(ev)
-			}
+outerLoop:
+	for {
+		ctx, ctxCancel := context.WithCancel(context.Background())
+		wg := &sync.WaitGroup{}
+		if cfgPath == "" {
+			cfgPath = getConfigPath()
 		}
-		if err := sc.Err(); err != nil {
+		var cfg *core.AppConfig
+		if cfg, err = core.LoadConfigFromFile(cfgPath); err != nil {
 			log.Fatal(err)
 		}
-	}()
-
-loop:
-	for {
-		blocks := make([]core.I3barBlock, 0)
+		managers := cfg.CreateManagers(ctx)
+		wg.Add(len(managers))
+		listeners := make([]*core.BlockletMgr, 0, len(managers))
+		updateChan := make(chan string)
 		for _, m := range managers {
-			blocks = append(blocks, m.Render()...)
-		}
-		b, _ := json.Marshal(blocks)
-		b = append(b, ',', '\n')
-		os.Stdout.Write(b)
-		select {
-		case updateData := <-updateChan:
-			for i := range managers {
-				managers[i].TryInvalidate(updateData)
+			go m.Run(updateChan, ctx, wg)
+			if m.IsListener() {
+				listeners = append(listeners, m)
 			}
-		case signal := <-signalChan:
-			switch signal {
-			case syscall.SIGUSR2:
-				// Reload bar
-				break
-			case syscall.SIGSTOP:
-				// Stop emitting JSON
-			case syscall.SIGCONT:
-				// Continue emitting JSON
-			case syscall.SIGTERM, syscall.SIGINT:
-				break loop
+		}
+		go func() {
+		loop:
+			for {
+				select {
+				case e := <-eventChan:
+					for _, m := range listeners {
+						m.ProcessEvent(e, ctx)
+					}
+				case <-ctx.Done():
+					break loop
+				}
+			}
+		}()
+	renderLoop:
+		for {
+			blocks := make([]core.I3barBlock, 0, len(managers))
+			for _, m := range managers {
+				blocks = append(blocks, m.Render()...)
+			}
+			if err := feedBlocks(os.Stdout, blocks); err != nil {
+				log.Print(err)
+			}
+			select {
+			case updateData := <-updateChan:
+				for i := range managers {
+					managers[i].TryInvalidate(updateData)
+				}
+			case signal := <-signalChan:
+				switch signal {
+				case syscall.SIGUSR2:
+					ctxCancel()
+					log.Println("Waiting for blocklets to finish...")
+					wg.Wait()
+					break renderLoop
+				case syscall.SIGSTOP:
+					// Stop emitting JSON
+				case syscall.SIGCONT:
+					// Continue emitting JSON
+				case syscall.SIGTERM, syscall.SIGINT:
+					ctxCancel()
+					c := make(chan struct{})
+					go func() {
+						wg.Wait()
+						c <- struct{}{}
+					}()
+					for {
+						select {
+						case <-c:
+							break outerLoop
+						case s := <-signalChan:
+							if s == syscall.SIGINT || s == syscall.SIGTERM {
+								log.Println(
+									"Blocks didn't finish. Exiting anyway...",
+								)
+								break outerLoop
+							}
+						}
+					}
+				}
 			}
 		}
 	}
-	core.Log.Println("\nBye.")
+	log.Println("Bye.")
 }

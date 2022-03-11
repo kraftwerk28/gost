@@ -51,6 +51,10 @@ func (s *IpcClient) Recv() (IpcMsgType, interface{}, error) {
 	return resHeader.Typ, out, nil
 }
 
+func (s *IpcClient) Close() error {
+	return s.conn.Close()
+}
+
 func (s *IpcClient) SendRaw(t IpcMsgType, data []byte) error {
 	var l uint32
 	if data != nil {

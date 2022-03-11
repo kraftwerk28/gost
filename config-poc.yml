@@ -1,29 +1,45 @@
+bat_common: &bat_common
+  level_icons: [" ", " ", " ", " ", " "]
+  state_icons:
+    charging: ''
+
 version: "3"
+
 blocks:
-  - name: shell
-    command: |
-      v=0
-      while :; do
-        echo "value = $((v++))"
-        sleep 3
-      done
+
   - name: shell
     command: ~/.config/waybar/weather.py
     interval: 5s
-  # - name: time
-  # - name: clicks
-  #   format: "clicked {clicks} times"
-  # - name: sway_layout
-  #   format: "{short} {flag} "
-  # - name: dbus
-  #   object_path: /bar
-  #   initial_text: bar
-  # - name: sway_window
+
   # - name: pulseaudio
   #   sink_format: "{sink_icon} {sink_volume}"
   #   source_format: "{source_icon} {source_volume}"
-  # - name: battery
-  #   device: battery_BAT0
+
+  # - name: network
+
+  # - name: cpu
+
+  - name: shell
+    command: >
+      awk -f ~/.config/waybar/cputemp.awk <(sensors)
+    json: true
+
+  - <<: *bat_common
+    name: battery
+    format: " {percentage}%"
+    upower_device: keyboard_hid_dco2co26o0co73o0b_battery
+
+  - <<: *bat_common
+    name: battery
+    format: "{state_icon}{percentage}%"
+
+  - name: sway_layout
+    format: "{flag}"
+
+  - name: time
+
+  # - name: plugin
+  #   path: /home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so
   # - name: battery
   #   device: keyboard_hid_dco2co26o0co73o0b_battery
   # - name: plugin

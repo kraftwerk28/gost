@@ -6,12 +6,21 @@ import (
 	"strings"
 )
 
+type I3barMarkup string
+
 const (
-	ButtonLeft       int = 1
-	ButtonMiddle         = 3
-	ButtonRight          = 3
-	ButtonScrollUp       = 4
-	ButtonScrollDown     = 5
+	MarkupNone  I3barMarkup = "none"
+	MarkupPango             = "pango"
+)
+
+type eventButton int
+
+const (
+	ButtonLeft       eventButton = 1
+	ButtonMiddle                 = 3
+	ButtonRight                  = 3
+	ButtonScrollUp               = 4
+	ButtonScrollDown             = 5
 )
 
 type I3barHeader struct {
@@ -22,16 +31,16 @@ type I3barHeader struct {
 }
 
 type I3barClickEvent struct {
-	Name      string `json:"name"`
-	Instance  string `json:"instance"`
-	X         int    `json:"x"`
-	Y         int    `json:"y"`
-	Button    int    `json:"button"`
-	Event     int    `json:"event"`
-	RelativeX int    `json:"relative_x"`
-	RelativeY int    `json:"relative_y"`
-	Width     int    `json:"width"`
-	Height    int    `json:"height"`
+	Name      string      `json:"name"`
+	Instance  string      `json:"instance"`
+	X         int         `json:"x"`
+	Y         int         `json:"y"`
+	Button    eventButton `json:"button"`
+	Event     int         `json:"event"`
+	RelativeX int         `json:"relative_x"`
+	RelativeY int         `json:"relative_y"`
+	Width     int         `json:"width"`
+	Height    int         `json:"height"`
 }
 
 func (e *I3barClickEvent) CustomBlockletName() string {
@@ -53,15 +62,74 @@ func NewEventFromRaw(raw []byte) (*I3barClickEvent, error) {
 	return ev, nil
 }
 
+type blockAlign string
+
+const (
+	BlockAlignLeft   blockAlign = "left"
+	BlockAlignRight             = "right"
+	BlockAlignCenter            = "center"
+)
+
 type I3barBlock struct {
-	FullText   string `json:"full_text"`
-	ShortText  string `json:"short_text,omitempty"`
-	Color      string `json:"color,omitempty"`
+	// The text that will be displayed. If missing, the block will be skipped.
+	FullText string `json:"full_text"`
+
+	// If given and the text needs to be shortened due to space, this will be
+	// displayed instead of full_text
+	ShortText string `json:"short_text,omitempty"`
+
+	// The text color to use in #RRGGBBAA or #RRGGBB notation
+	Color string `json:"color,omitempty"`
+
+	// The background color for the block in #RRGGBBAA or #RRGGBB notation
 	Background string `json:"background,omitempty"`
-	Border     string `json:"border,omitempty"`
-	BorderTop  string `json:"border_top,omitempty"`
-	// Omitted...
+
+	// The border color for the block in #RRGGBBAA or #RRGGBB notation
+	Border string `json:"border,omitempty"`
+
+	// The height in pixels of the top border. The default is 1
+	BorderTop int `json:"border_top,omitempty"`
+
+	// The height in pixels of the bottom border. The default is 1
+	BorderBottom int `json:"border_bottom,omitempty"`
+
+	// The width in pixels of the left border. The default is 1
+	BorderLeft int `json:"border_left,omitempty"`
+
+	// The width in pixels of the right border. The default is 1
+	BorderRight int `json:"border_right,omitempty"`
+
+	// TODO: custom type
+	MinWidth int `json:"min_width"`
+
+	// If the text does not span the full width of the block, this specifies
+	// how the text should be aligned inside of the block. This can be left
+	// (default), right, or center.
+	Align blockAlign `json:"align,omitempty"`
+
+	// A name for the block. This is only used to identify the block for click
+	// events. If set, each block should have a unique name and instance pair.
 	Name string `json:"name,omitempty"`
-	// Omitted...
+
+	// The instance of the name for the block. This is only used to identify the
+	// block for click events. If set, each block should have a unique name and
+	// instance pair.
+	Instance string `json:"instance,omitempty"`
+
+	// Whether the block should be displayed as urgent. Currently swaybar
+	// utilizes the colors set in the sway config for urgent workspace buttons.
+	// See sway-bar(5) for more information on bar color configuration.
+	Urgent bool `json:"urgent,omitempty"`
+
+	// Whether the bar separator should be drawn after the block. See
+	// sway-bar(5) for more information on how to set the separator text.
+	Separator bool `json:"separator,omitempty"`
+
+	// The amount of pixels to leave blank after the block. The separator text
+	// will be displayed centered in this gap. The default is 9 pixels.
+	SeparatorBlockWidth int `json:"separator_block_width,omitempty"`
+
+	// The type of markup to use when parsing the text for the block. This can
+	// either be pango or none (default).
 	Markdup string `json:"markup,omitempty"`
 }

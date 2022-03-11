@@ -1,7 +1,11 @@
 package core
 
 import (
+	"context"
 	"errors"
+	"log"
+	"os"
+	"plugin"
 	"regexp"
 	"strconv"
 	"time"
@@ -60,11 +64,66 @@ type AppConfig struct {
 	Blocks  []BlockletConfig `yaml:"blocks"`
 }
 
+func LoadConfigFromFile(filename string) (*AppConfig, error) {
+	cfgFile, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer cfgFile.Close()
+	cfgDecoder := yaml.NewDecoder(cfgFile)
+	cfg := &AppConfig{}
+	if err := cfgDecoder.Decode(cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (cfg *AppConfig) CreateManagers(ctx context.Context) []*BlockletMgr {
+	managers := make([]*BlockletMgr, 0, len(cfg.Blocks))
+	for _, c := range cfg.Blocks {
+		var ctor I3barBlockletCtor
+		if c.Name == "plugin" {
+			handle, err := plugin.Open(c.Path)
+			if err != nil {
+				log.Println("Failed to load plugin:")
+				log.Print(err)
+				continue
+			}
+			sym, err := handle.Lookup("NewBlock")
+			if err != nil {
+				log.Println("Plugin must have `func NewBlock() I3barBlocklet`:")
+				log.Print(err)
+				continue
+			}
+			if c, ok := sym.(*I3barBlockletCtor); ok {
+				ctor = *c
+			} else {
+				log.Println("Bad constructor")
+				continue
+			}
+		} else if ct := GetBuiltin(c.Name); ct != nil {
+			ctor = ct
+		} else {
+			log.Fatalf(`Unrecognized blocklet name: "%s"`, c.Name)
+		}
+		blocklet := ctor()
+		if b, ok := blocklet.(I3barBlockletConfigurable); ok {
+			cf, _ := yaml.Marshal(c)
+			if err := yaml.Unmarshal(cf, b.GetConfig()); err != nil {
+				log.Fatal(err)
+			}
+		}
+		m := NewBlockletMgr(c.Name, blocklet, ctx)
+		managers = append(managers, m)
+	}
+	return managers
+}
+
 // TODO: use different formatters?
 type ConfigFormat struct {
 	formatting.RustLikeFmt
 }
 
 func NewConfigFormatFromString(s string) *ConfigFormat {
-	return &ConfigFormat{*formatting.NewFromString(s)}
+	return &ConfigFormat{formatting.NewFromString(s)}
 }
