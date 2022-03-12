@@ -15,7 +15,11 @@ blocks:
   #   sink_format: "{sink_icon} {sink_volume}"
   #   source_format: "{source_icon} {source_volume}"
 
-  # - name: network
+  - name: networkmanager
+    format: "{ssid} {strength:3*%}"
+    icons:
+      connected: 
+    primary_only: true
 
   # - name: cpu
 
@@ -26,12 +30,12 @@ blocks:
 
   - <<: *bat_common
     name: battery
-    format: " {percentage}%"
+    format: " {percentage:3*%}"
     upower_device: keyboard_hid_dco2co26o0co73o0b_battery
 
   - <<: *bat_common
     name: battery
-    format: "{state_icon}{percentage}%"
+    format: "{state_icon}{percentage:3*%}"
 
   - name: sway_layout
     format: "{flag}"

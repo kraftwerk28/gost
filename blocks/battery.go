@@ -8,8 +8,8 @@ import (
 	"github.com/kraftwerk28/gost/core/formatting"
 )
 
-const dbUpower = "org.freedesktop.UPower"
-const pathUpower = "/org/freedesktop/UPower"
+const upowerDbusDest = "org.freedesktop.UPower"
+const upowerDbusBasePath dbus.ObjectPath = "/org/freedesktop/UPower"
 
 const (
 	upowerStateUnknown          uint32 = 0
@@ -96,7 +96,7 @@ func (t *BatteryBlock) getStateIcon() string {
 
 func (t *BatteryBlock) listDevices(ctx context.Context) (r []dbus.ObjectPath, e error) {
 	e = t.dbusConn.Object(
-		dbUpower, pathUpower,
+		upowerDbusDest, upowerDbusBasePath,
 	).CallWithContext(
 		ctx, "org.freedesktop.UPower.EnumerateDevices", 0,
 	).Store(&r)
@@ -114,10 +114,10 @@ func (t *BatteryBlock) findLaptopBattery(ctx context.Context) (p dbus.ObjectPath
 	for _, oPath := range devices {
 		var devType uint32
 		e = t.dbusConn.Object(
-			dbUpower, oPath,
+			upowerDbusDest, oPath,
 		).CallWithContext(
 			ctx, "org.freedesktop.DBus.Properties.Get", 0,
-			dbUpower+".Device", "Type",
+			upowerDbusDest+".Device", "Type",
 		).Store(&devType)
 		if e != nil {
 			return
@@ -131,8 +131,8 @@ func (t *BatteryBlock) findLaptopBattery(ctx context.Context) (p dbus.ObjectPath
 }
 
 func (t *BatteryBlock) loadInitial(b *dbus.Conn) {
-	obj := b.Object(dbUpower, dbus.ObjectPath(t.UpowerDevice))
-	iface := dbUpower + ".Device"
+	obj := b.Object(upowerDbusDest, dbus.ObjectPath(t.UpowerDevice))
+	iface := upowerDbusDest + ".Device"
 	for k, v := range t.propMap {
 		obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, k).Store(v)
 	}
@@ -158,8 +158,8 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 	defer b.Close()
 	if err := b.AddMatchSignalContext(
 		ctx,
-		dbus.WithMatchSender(dbUpower),
-		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchSender(upowerDbusDest),
+		dbus.WithMatchInterface(dbusGetProperty),
 		dbus.WithMatchMember("PropertiesChanged"),
 	); err != nil {
 		Log.Print(err)

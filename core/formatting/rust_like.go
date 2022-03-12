@@ -94,6 +94,10 @@ func (p *fmtPlaceholder) format(value interface{}) string {
 	case reflect.String:
 		r = vof.String()
 	}
+	suffix := ""
+	if p.unit == "%" {
+		suffix += "%"
+	}
 	if p.minWidth > -1 && len(r) < p.minWidth {
 		fill := " "
 		if p.minWidthZero {
@@ -104,7 +108,7 @@ func (p *fmtPlaceholder) format(value interface{}) string {
 	if p.maxWidth > -1 && len(r) > p.maxWidth {
 		r = r[:p.maxWidth]
 	}
-	return r
+	return r + suffix
 }
 
 func Parse(fstr string) (parts []fmtPart) {

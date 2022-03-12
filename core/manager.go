@@ -31,7 +31,7 @@ func (bm *BlockletMgr) invalidateCache() {
 		} else {
 			blocks[i].Name = fmt.Sprintf("%s:%s", bm.name, blocks[i].Name)
 		}
-		blocks[i].Separator = true
+		blocks[i].SeparatorBlockWidth = 16
 	}
 	bm.renderCache = blocks
 }
