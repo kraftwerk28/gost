@@ -14,54 +14,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var dr = regexp.MustCompile(`^(\d+)([smh]|ms)?$`)
-
-type ConfigInterval time.Duration
-
-func NewFromString(v string) (*ConfigInterval, error) {
-	m := dr.FindStringSubmatch(v)
-	if m == nil {
-		return nil, errors.New("Invalid value for `interval`")
-	}
-	var base time.Duration
-	mul, _ := strconv.Atoi(m[1])
-	switch m[2] {
-	case "s", "":
-		base = time.Second
-	case "m":
-		base = time.Minute
-	case "h":
-		base = time.Hour
-	case "ms":
-		base = time.Millisecond
-	}
-	res := ConfigInterval(base * time.Duration(mul))
-	return &res, nil
-}
-
-func (c *ConfigInterval) UnmarshalYAML(value *yaml.Node) error {
-	var v string
-	if err := value.Decode(&v); err != nil {
-		return err
-	}
-	result, err := NewFromString(v)
-	if err != nil {
-		return err
-	}
-	*c = *result
-	return nil
-}
-
-type BlockletConfig struct {
-	Name string `yaml:"name"`
-	// Path to plugin, if `name == "plugin"`
-	Path string                 `yaml:"path"`
-	Rest map[string]interface{} `yaml:",inline"`
-}
-
 type AppConfig struct {
-	Version string           `yaml:"version"`
-	Blocks  []BlockletConfig `yaml:"blocks"`
+	Version        string           `yaml:"version"`
+	SeparatorWidth int              `yaml:"separator_width"`
+	Blocks         []BlockletConfig `yaml:"blocks"`
 }
 
 func LoadConfigFromFile(filename string) (*AppConfig, error) {
@@ -113,10 +69,55 @@ func (cfg *AppConfig) CreateManagers(ctx context.Context) []*BlockletMgr {
 				log.Fatal(err)
 			}
 		}
-		m := NewBlockletMgr(c.Name, blocklet, ctx)
+		m := NewBlockletMgr(c.Name, blocklet, cfg)
 		managers = append(managers, m)
 	}
 	return managers
+}
+
+var durationRegexp = regexp.MustCompile(`^(\d+)([smh]|ms)?$`)
+
+type ConfigInterval time.Duration
+
+func NewFromString(v string) (*ConfigInterval, error) {
+	m := durationRegexp.FindStringSubmatch(v)
+	if m == nil {
+		return nil, errors.New("Invalid value for `interval`")
+	}
+	var base time.Duration
+	mul, _ := strconv.Atoi(m[1])
+	switch m[2] {
+	case "s", "":
+		base = time.Second
+	case "m":
+		base = time.Minute
+	case "h":
+		base = time.Hour
+	case "ms":
+		base = time.Millisecond
+	}
+	res := ConfigInterval(base * time.Duration(mul))
+	return &res, nil
+}
+
+func (c *ConfigInterval) UnmarshalYAML(value *yaml.Node) error {
+	var v string
+	if err := value.Decode(&v); err != nil {
+		return err
+	}
+	result, err := NewFromString(v)
+	if err != nil {
+		return err
+	}
+	*c = *result
+	return nil
+}
+
+type BlockletConfig struct {
+	Name string `yaml:"name"`
+	// Path to plugin, if `name == "plugin"`
+	Path string                 `yaml:"path"`
+	Rest map[string]interface{} `yaml:",inline"`
 }
 
 // TODO: use different formatters?

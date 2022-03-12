@@ -14,13 +14,17 @@ type BlockletMgr struct {
 	name        string
 	blocklet    I3barBlocklet
 	renderCache []I3barBlock
+	appConfig   *AppConfig
 }
 
-func NewBlockletMgr(name string, b I3barBlocklet, ctx context.Context) *BlockletMgr {
+func NewBlockletMgr(
+	name string,
+	b I3barBlocklet,
+	cfg *AppConfig,
+) *BlockletMgr {
 	bmName := fmt.Sprintf("%s:%d", name, blockletCounters[name])
-	bm := BlockletMgr{name: bmName, blocklet: b}
 	blockletCounters[name]++
-	return &bm
+	return &BlockletMgr{name: bmName, blocklet: b, appConfig: cfg}
 }
 
 func (bm *BlockletMgr) invalidateCache() {
@@ -31,7 +35,9 @@ func (bm *BlockletMgr) invalidateCache() {
 		} else {
 			blocks[i].Name = fmt.Sprintf("%s:%s", bm.name, blocks[i].Name)
 		}
-		blocks[i].SeparatorBlockWidth = 16
+		if w := bm.appConfig.SeparatorWidth; w > 0 {
+			blocks[i].SeparatorBlockWidth = w
+		}
 	}
 	bm.renderCache = blocks
 }

@@ -9,8 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// var rustFmtRe = regexp.MustCompile(`(?:^|[^{])\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?(?:;( )?(_)?([num1KMGT]))?(?:\*(_)?([\w%]+))?(?:#(\d+))?\}`)
-var rustFmtRe = regexp.MustCompile(`\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?(?:;( )?(_)?([num1KMGT]))?(?:\*(_)?([\w%]+))?(?:#(\d+))?\}`)
+var rustFmtRe = regexp.MustCompile(
+	`\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?(?:;( )?(_)?([num1KMGT]))?(?:\*(_)?([\w%]+))?(?:#(\d+))?(?:\$(\d*))?\}`,
+)
 
 // 2  3  name
 // 4  5  min width zero
@@ -22,6 +23,7 @@ var rustFmtRe = regexp.MustCompile(`\{(\w+)(?::(0)?(\d+))?(?:\^(\d+))?(?:;( )?(_
 // 16 17 unit underscore
 // 18 19 unit
 // 20 21 bar max value
+// 22 23 trailing space count
 
 // {<name>[:[0]<min width>][^<max width>][;[ ][_]<min prefix>][*[_]<unit>][#<bar max value>]}
 // (?:^|[^{])\{(\w+)(?::(\d+))?(?:\^(\d+))?\}
@@ -43,6 +45,7 @@ type fmtPlaceholder struct {
 	unit                          string
 	hideUnit                      bool
 	barMaxValue                   int
+	trailingSpaceCount            int
 }
 
 func NewFromString(v string) RustLikeFmt {
@@ -84,19 +87,27 @@ func (p *fmtPlaceholder) format(value interface{}) string {
 		}
 		const floatPrecision = 8
 		r = strconv.FormatFloat(n, 'f', floatPrecision, 64)
-	case reflect.Int, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint32, reflect.Uint64:
+	case reflect.Int, reflect.Int32, reflect.Int64:
 		n := vof.Int()
 		if max := int64(p.barMaxValue); p.barMaxValue != -1 && n > max {
 			n = max
 		}
 		r = strconv.FormatInt(n, 10)
+	case reflect.Uint, reflect.Uint32, reflect.Uint64:
+		n := vof.Uint()
+		if max := uint64(p.barMaxValue); p.barMaxValue != -1 && n > max {
+			n = max
+		}
+		r = strconv.FormatUint(n, 10)
 	case reflect.String:
 		r = vof.String()
 	}
 	suffix := ""
 	if p.unit == "%" {
 		suffix += "%"
+	}
+	if p.trailingSpaceCount > 0 {
+		suffix += strings.Repeat(" ", p.trailingSpaceCount)
 	}
 	if p.minWidth > -1 && len(r) < p.minWidth {
 		fill := " "
@@ -159,6 +170,13 @@ func Parse(fstr string) (parts []fmtPart) {
 		if m[20] != -1 {
 			barMaxValue, _ = strconv.Atoi(fstr[m[20]:m[21]])
 		}
+		trailingSpace := 0
+		if m[22] != -1 {
+			trailingSpace = 1
+			if s := fstr[m[22]:m[23]]; s != "" {
+				trailingSpace, _ = strconv.Atoi(s)
+			}
+		}
 		p := fmtPlaceholder{
 			name,
 			minWidthZero,
@@ -168,6 +186,7 @@ func Parse(fstr string) (parts []fmtPart) {
 			unit,
 			hideUnit,
 			barMaxValue,
+			trailingSpace,
 		}
 		parts = append(
 			parts,

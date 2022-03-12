@@ -115,6 +115,7 @@ func (c *PulseBlock) getCurrentSource() (*pulseaudio.Source, error) {
 
 func (c *PulseBlock) Run(ch UpdateChan, ctx context.Context) {
 	client, _ := pulseaudio.NewClient()
+	defer client.Close()
 	c.client = client
 	upd, _ := client.Updates()
 	c.fetchInfo()
@@ -126,6 +127,8 @@ func (c *PulseBlock) Run(ch UpdateChan, ctx context.Context) {
 		case <-throttleTimer.C:
 			c.fetchInfo()
 			ch.SendUpdate()
+		case <-ctx.Done():
+			return
 		}
 	}
 }

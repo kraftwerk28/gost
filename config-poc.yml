@@ -5,42 +5,52 @@ bat_common: &bat_common
 
 version: "3"
 
+separator_width: 10
+
 blocks:
 
   - name: shell
-    command: ~/.config/waybar/weather.py
-    interval: 5s
+    command: |
+      date
+      sleep 1
+    restart_on_exit: true
+
+  # - name: shell
+  #   command: ~/.config/waybar/weather.py
+  #   interval: 5s
 
   # - name: pulseaudio
   #   sink_format: "{sink_icon} {sink_volume}"
   #   source_format: "{source_icon} {source_volume}"
 
-  - name: networkmanager
-    format: "{ssid} {strength:3*%}"
-    icons:
-      connected: 
-    primary_only: true
+  # - name: networkmanager
+  #   format: "{status_icon$}{strength:3*%}"
+  #   status_icons:
+  #     connected: "直"
+  #     disconnected: "睊"
+  #     connecting: " "
+  #   primary_only: true
 
   # - name: cpu
 
-  - name: shell
-    command: >
-      awk -f ~/.config/waybar/cputemp.awk <(sensors)
-    json: true
+  # - name: shell
+  #   command: >
+  #     awk -f ~/.config/waybar/cputemp.awk <(sensors)
+  #   json: true
 
-  - <<: *bat_common
-    name: battery
-    format: " {percentage:3*%}"
-    upower_device: keyboard_hid_dco2co26o0co73o0b_battery
+  # - <<: *bat_common
+  #   name: battery
+  #   format: " {percentage:3*%}"
+  #   upower_device: keyboard_hid_dco2co26o0co73o0b_battery
 
-  - <<: *bat_common
-    name: battery
-    format: "{state_icon}{percentage:3*%}"
+  # - <<: *bat_common
+  #   name: battery
+  #   format: "{state_icon}{percentage:3*%}"
 
-  - name: sway_layout
-    format: "{flag}"
+  # - name: sway_layout
+  #   format: "{flag}"
 
-  - name: time
+  # - name: time
 
   # - name: plugin
   #   path: /home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so

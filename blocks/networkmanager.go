@@ -2,6 +2,8 @@ package blocks
 
 import (
 	"context"
+	"encoding/binary"
+	"net"
 
 	"github.com/godbus/dbus/v5"
 	. "github.com/kraftwerk28/gost/core"
@@ -25,15 +27,19 @@ const (
 )
 
 type NetworkManagerBlockConfig struct {
-	Format      *ConfigFormat `yaml:"format"`
-	PrimaryOnly bool          `yaml:"primary_only,omitempty"`
+	Format      *ConfigFormat     `yaml:"format"`
+	PrimaryOnly bool              `yaml:"primary_only,omitempty"`
+	StatusIcons map[string]string `yaml:"status_icons"`
 }
 
 type NmActiveConnection struct {
 	connectionPath  dbus.ObjectPath
 	accessPointPath dbus.ObjectPath
+	ipv4ConfigPath  dbus.ObjectPath
+	ipv6ConfigPath  dbus.ObjectPath
 	strength        int
 	ssid            string
+	ipv4            net.IP
 }
 
 type NetworkManagerBlock struct {
@@ -41,6 +47,7 @@ type NetworkManagerBlock struct {
 	dbus        *dbus.Conn
 	propMap     map[string]interface{}
 	connections []NmActiveConnection
+	state       nmState
 }
 
 func NewNetworkManagerBlock() I3barBlocklet {
@@ -63,67 +70,123 @@ func (t *NetworkManagerBlock) getDbusProperty(
 	return
 }
 
-func (t *NetworkManagerBlock) getState() (result nmState, err error) {
-	err = t.getDbusProperty(nmDbusDest, "State", &result)
+func (t *NetworkManagerBlock) loadState() (err error) {
+	err = t.getDbusProperty(nmDbusDest, "State", &t.state)
 	return
 }
 
 func (t *NetworkManagerBlock) loadConnectionProps(conn *NmActiveConnection) (err error) {
 	apObj := t.dbus.Object(nmDbusDest, conn.accessPointPath)
 	apIface := nmDbusDest + ".AccessPoint"
-	if err = apObj.Call(
-		dbusGetProperty, 0,
-		apIface, "Strength",
-	).Store(&conn.strength); err != nil {
+	if err = apObj.Call(dbusGetProperty, 0, apIface, "Strength").Store(&conn.strength); err != nil {
 		return
 	}
 	var ssidByte []byte
-	if err = apObj.Call(
-		dbusGetProperty, 0,
-		apIface, "Ssid",
-	).Store(&ssidByte); err != nil {
+	if err = apObj.Call(dbusGetProperty, 0, apIface, "Ssid").Store(&ssidByte); err != nil {
 		return
 	}
 	conn.ssid = string(ssidByte)
+
+	ip4Obj := t.dbus.Object(nmDbusDest, conn.ipv4ConfigPath)
+	var ipv4Addresses [][]uint32
+	if err = ip4Obj.Call(
+		dbusGetProperty, 0,
+		nmDbusDest+".IP4Config", "Addresses",
+	).Store(&ipv4Addresses); err != nil {
+		Log.Println(err)
+		return
+	}
+	conn.ipv4 = make(net.IP, 4)
+	binary.BigEndian.PutUint32(conn.ipv4, ipv4Addresses[0][0])
 	return
 }
 
-func (t *NetworkManagerBlock) loadConnections(primaryOnly bool) (err error) {
+func (t *NetworkManagerBlock) loadConnections() (err error) {
+	if err = t.loadState(); err != nil {
+		return
+	}
+	if t.state != nmStateConnectedGlobal {
+		t.connections = nil
+		return
+	}
 	t.connections = make([]NmActiveConnection, 0)
 	var connPaths []dbus.ObjectPath
-	if primaryOnly {
+	if t.PrimaryOnly {
 		var p dbus.ObjectPath
-		if err = t.getDbusProperty(
-			nmDbusDest, "PrimaryConnection", &p,
-		); err != nil {
+		if err = t.getDbusProperty(nmDbusDest, "PrimaryConnection", &p); err != nil {
 			return
 		}
 		connPaths = []dbus.ObjectPath{p}
 	} else {
-		if err = t.getDbusProperty(
-			nmDbusDest, "ActiveConnections", &connPaths,
-		); err != nil {
+		if err = t.getDbusProperty(nmDbusDest, "ActiveConnections", &connPaths); err != nil {
 			return
 		}
 	}
 	for _, connPath := range connPaths {
-		var apPath dbus.ObjectPath
-		if err = t.dbus.Object(
-			nmDbusDest, connPath,
-		).Call(
-			dbusGetProperty, 0,
-			nmDbusDest+".Connection.Active", "SpecificObject",
-		).Store(&apPath); err != nil {
+		var apPath, ipv4Path, ipv6Path dbus.ObjectPath
+		dbusObj := t.dbus.Object(nmDbusDest, connPath)
+		connIface := nmDbusDest + ".Connection.Active"
+		if err = dbusObj.Call(dbusGetProperty, 0, connIface, "SpecificObject").Store(&apPath); err != nil {
+			return
+		}
+		if err = dbusObj.Call(dbusGetProperty, 0, connIface, "Ip4Config").Store(&ipv4Path); err != nil {
+			return
+		}
+		if err = dbusObj.Call(dbusGetProperty, 0, connIface, "Ip6Config").Store(&ipv6Path); err != nil {
 			return
 		}
 		activeConn := NmActiveConnection{
 			connectionPath:  connPath,
 			accessPointPath: apPath,
+			ipv4ConfigPath:  ipv4Path,
+			ipv6ConfigPath:  ipv6Path,
 		}
-		t.loadConnectionProps(&activeConn)
+		if err = t.loadConnectionProps(&activeConn); err != nil {
+			return
+		}
 		t.connections = append(t.connections, activeConn)
 	}
 	return
+}
+
+func (t *NetworkManagerBlock) addDbusSignals(ctx context.Context) (err error) {
+	b := t.dbus
+	if err = b.AddMatchSignalContext(
+		ctx,
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchObjectPath("/org/freedesktop/NetworkManager"),
+		dbus.WithMatchMember("PropertiesChanged"),
+	); err != nil {
+		return
+	}
+	if err = b.AddMatchSignalContext(
+		ctx,
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchPathNamespace("/org/freedesktop/NetworkManager/ActiveConnection"),
+		dbus.WithMatchMember("PropertiesChanged"),
+	); err != nil {
+		return
+	}
+	if err = b.AddMatchSignalContext(
+		ctx,
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchPathNamespace("/org/freedesktop/NetworkManager/AccessPoint"),
+		dbus.WithMatchMember("PropertiesChanged"),
+	); err != nil {
+		return
+	}
+	return
+}
+
+func (t *NetworkManagerBlock) getStatusIcon() string {
+	switch t.state {
+	case nmStateConnectedGlobal:
+		return t.StatusIcons["connected"]
+	case nmStateConnecting:
+		return t.StatusIcons["connecting"]
+	default:
+		return t.StatusIcons["disconnected"]
+	}
 }
 
 func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
@@ -134,35 +197,13 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 	defer b.Close()
 	t.dbus = b
-	if err := t.loadConnections(t.PrimaryOnly); err != nil {
+	if err := t.addDbusSignals(ctx); err != nil {
+		Log.Println(err)
 		return
 	}
-	if err := b.AddMatchSignalContext(
-		ctx,
-		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
-		dbus.WithMatchObjectPath("/org/freedesktop/NetworkManager"),
-		dbus.WithMatchMember("PropertiesChanged"),
-	); err != nil {
+	if err := t.loadConnections(); err != nil {
+		// Don't fail
 		Log.Print(err)
-		return
-	}
-	if err := b.AddMatchSignalContext(
-		ctx,
-		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
-		dbus.WithMatchPathNamespace("/org/freedesktop/NetworkManager/ActiveConnection"),
-		dbus.WithMatchMember("PropertiesChanged"),
-	); err != nil {
-		Log.Print(err)
-		return
-	}
-	if err := b.AddMatchSignalContext(
-		ctx,
-		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
-		dbus.WithMatchPathNamespace("/org/freedesktop/NetworkManager/AccessPoint"),
-		dbus.WithMatchMember("PropertiesChanged"),
-	); err != nil {
-		Log.Print(err)
-		return
 	}
 	c := make(chan *dbus.Signal)
 	b.Signal(c)
@@ -173,7 +214,12 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 			return
 		case s := <-c:
 			// s.Path -> path to AccessPoint
-			// Log.Printf("NetworkManager signal: %+v\n", s)
+			if len(t.connections) == 0 {
+				// Was not connected, maybe now it is...
+				t.loadConnections()
+				ch.SendUpdate()
+				continue
+			}
 			changedProps := s.Body[1].(map[string]dbus.Variant)
 			shouldUpdate := false
 			for i, conn := range t.connections {
@@ -186,33 +232,39 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 						}
 					}
 				} else if s.Path == conn.connectionPath {
-					// TODO
+					if err := t.loadConnections(); err != nil {
+						Log.Print(err)
+					} else {
+						ch.SendUpdate()
+					}
 				}
 			}
 			if shouldUpdate {
 				ch.SendUpdate()
 			}
-			// // for k, v := range changedProps {
-			// // 	if ref, ok := t.propMap[k]; ok {
-			// // 		v.Store(ref)
-			// // 	}
-			// // }
-			// ch.SendUpdate()
 		}
 	}
 }
 
 func (t *NetworkManagerBlock) Render() []I3barBlock {
-	if len(t.connections) == 0 {
-		return nil
+	if t.state == nmStateConnectedGlobal {
+		c := t.connections[0]
+		ipMarshalled, _ := c.ipv4.MarshalText()
+		return []I3barBlock{{
+			FullText: t.Format.Expand(formatting.NamedArgs{
+				"ssid":        c.ssid,
+				"strength":    c.strength,
+				"ipv4":        string(ipMarshalled),
+				"status_icon": t.getStatusIcon(),
+			}),
+		}}
+	} else {
+		return []I3barBlock{{
+			FullText: t.Format.Expand(formatting.NamedArgs{
+				"status_icon": t.getStatusIcon(),
+			}),
+		}}
 	}
-	conn := t.connections[0]
-	return []I3barBlock{{
-		FullText: t.Format.Expand(formatting.NamedArgs{
-			"ssid":     conn.ssid,
-			"strength": conn.strength,
-		}),
-	}}
 }
 
 func init() {

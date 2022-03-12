@@ -57,19 +57,28 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 			outp, err := cmd.Output()
 			if err != nil {
 				Log.Print(err)
-				break
+			} else {
+				t.lastText = postProcessCmdOutput(outp)
+				ch.SendUpdate()
 			}
-			t.lastText = postProcessCmdOutput(outp)
-			ch.SendUpdate()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 		}
 	} else if t.Interval != nil {
 		ticker := time.Tick(time.Duration(*t.Interval))
 	loop:
 		for {
 			cmd := t.newCmd(ctx)
-			outp, _ := cmd.Output()
-			t.lastText = postProcessCmdOutput(outp)
-			ch.SendUpdate()
+			outp, err := cmd.Output()
+			if err != nil {
+				Log.Println(err)
+			} else {
+				t.lastText = postProcessCmdOutput(outp)
+				ch.SendUpdate()
+			}
 			select {
 			case <-ticker:
 				continue loop
