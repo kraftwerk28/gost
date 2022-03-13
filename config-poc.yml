@@ -9,19 +9,32 @@ separator_width: 10
 
 blocks:
 
-  - name: shell
-    command: |
-      date
-      sleep 1
-    restart_on_exit: true
+  # - name: shell
+  #   command: |
+  #     date
+  #     sleep 1
+  #   restart_on_exit: true
 
   # - name: shell
   #   command: ~/.config/waybar/weather.py
   #   interval: 5s
 
   # - name: pulseaudio
-  #   sink_format: "{sink_icon} {sink_volume}"
-  #   source_format: "{source_icon} {source_volume}"
+  #   node: sink
+  #   format: "{icon} {volume}"
+  #   on_click: |
+  #     case $BUTTON in
+  #       Right)
+  #         /home/kraftwerk28/.config/waybar/switch_audio_sink.py
+  #         ;;
+  #       Left)
+  #         pavucontrol
+  #         ;;
+  #     esac
+
+  # - name: pulseaudio
+  #   node: source
+  #   format: "{icon} {volume}"
 
   # - name: networkmanager
   #   format: "{status_icon$}{strength:3*%}"
@@ -43,9 +56,9 @@ blocks:
   #   format: " {percentage:3*%}"
   #   upower_device: keyboard_hid_dco2co26o0co73o0b_battery
 
-  # - <<: *bat_common
-  #   name: battery
-  #   format: "{state_icon}{percentage:3*%}"
+  - <<: *bat_common
+    name: battery
+    format: "{is_charging$}{state_icon}{percentage:3*%}"
 
   # - name: sway_layout
   #   format: "{flag}"

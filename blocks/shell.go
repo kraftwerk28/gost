@@ -4,20 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	. "github.com/kraftwerk28/gost/core"
-)
-
-const (
-	eventButtonEnv = "button"
-	eventXEnv      = "x"
-	eventYEnv      = "y"
 )
 
 type ShellBlockConfig struct {
@@ -112,14 +104,7 @@ func (t *ShellBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	if t.OnClickCommand == nil {
 		return
 	}
-	cmd := exec.CommandContext(ctx, "sh", "-c", *t.OnClickCommand)
-	cmd.Env = append(
-		os.Environ(),
-		fmt.Sprintf("%s=%d", eventButtonEnv, e.Button),
-		fmt.Sprintf("%s=%d", eventXEnv, e.X),
-		fmt.Sprintf("%s=%d", eventYEnv, e.X),
-	)
-	cmd.Stdout = Log.Writer()
+	cmd := e.ShellCommand(*t.OnClickCommand, ctx)
 	if err := cmd.Run(); err != nil {
 		Log.Println(err)
 	}

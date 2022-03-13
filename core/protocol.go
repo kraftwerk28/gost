@@ -2,7 +2,11 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -15,9 +19,26 @@ const (
 
 type eventButton int
 
+func (b eventButton) String() string {
+	switch b {
+	case ButtonLeft:
+		return "Left"
+	case ButtonMiddle:
+		return "Middle"
+	case ButtonRight:
+		return "Right"
+	case ButtonScrollUp:
+		return "ScrollUp"
+	case ButtonScrollDown:
+		return "ScrollDown"
+	default:
+		return ""
+	}
+}
+
 const (
 	ButtonLeft       eventButton = 1
-	ButtonMiddle                 = 3
+	ButtonMiddle                 = 2
 	ButtonRight                  = 3
 	ButtonScrollUp               = 4
 	ButtonScrollDown             = 5
@@ -46,6 +67,21 @@ type I3barClickEvent struct {
 func (e *I3barClickEvent) CustomBlockletName() string {
 	i := strings.LastIndexByte(e.Name, ':')
 	return e.Name[i+1:]
+}
+
+func (e *I3barClickEvent) ShellCommand(
+	command string,
+	ctx context.Context,
+) (cmd *exec.Cmd) {
+	cmd = exec.CommandContext(ctx, "sh", "-c", command)
+	cmd.Env = append(
+		os.Environ(),
+		fmt.Sprintf("BUTTON=%s", e.Button.String()),
+		fmt.Sprintf("X=%d", e.X),
+		fmt.Sprintf("Y=%d", e.Y),
+	)
+	cmd.Stdout = Log.Writer()
+	return
 }
 
 func NewEventFromRaw(raw []byte) (*I3barClickEvent, error) {

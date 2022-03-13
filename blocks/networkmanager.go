@@ -44,10 +44,11 @@ type NmActiveConnection struct {
 
 type NetworkManagerBlock struct {
 	NetworkManagerBlockConfig
-	dbus        *dbus.Conn
-	propMap     map[string]interface{}
-	connections []NmActiveConnection
-	state       nmState
+	dbus              *dbus.Conn
+	propMap           map[string]interface{}
+	connections       []NmActiveConnection
+	state             nmState
+	currentConnection int
 }
 
 func NewNetworkManagerBlock() I3barBlocklet {
@@ -246,22 +247,22 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 }
 
-func (t *NetworkManagerBlock) Render() []I3barBlock {
-	if t.state == nmStateConnectedGlobal {
-		c := t.connections[0]
+func (b *NetworkManagerBlock) Render() []I3barBlock {
+	if b.state == nmStateConnectedGlobal {
+		c := b.connections[b.currentConnection]
 		ipMarshalled, _ := c.ipv4.MarshalText()
 		return []I3barBlock{{
-			FullText: t.Format.Expand(formatting.NamedArgs{
+			FullText: b.Format.Expand(formatting.NamedArgs{
 				"ssid":        c.ssid,
 				"strength":    c.strength,
 				"ipv4":        string(ipMarshalled),
-				"status_icon": t.getStatusIcon(),
+				"status_icon": b.getStatusIcon(),
 			}),
 		}}
 	} else {
 		return []I3barBlock{{
-			FullText: t.Format.Expand(formatting.NamedArgs{
-				"status_icon": t.getStatusIcon(),
+			FullText: b.Format.Expand(formatting.NamedArgs{
+				"status_icon": b.getStatusIcon(),
 			}),
 		}}
 	}

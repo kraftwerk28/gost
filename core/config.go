@@ -100,17 +100,17 @@ func NewFromString(v string) (*ConfigInterval, error) {
 	return &res, nil
 }
 
-func (c *ConfigInterval) UnmarshalYAML(value *yaml.Node) error {
+func (c *ConfigInterval) UnmarshalYAML(value *yaml.Node) (err error) {
 	var v string
-	if err := value.Decode(&v); err != nil {
-		return err
+	if err = value.Decode(&v); err != nil {
+		return
 	}
-	result, err := NewFromString(v)
-	if err != nil {
-		return err
+	result := new(ConfigInterval)
+	if result, err = NewFromString(v); err != nil {
+		return
 	}
 	*c = *result
-	return nil
+	return
 }
 
 type BlockletConfig struct {
@@ -127,4 +127,30 @@ type ConfigFormat struct {
 
 func NewConfigFormatFromString(s string) *ConfigFormat {
 	return &ConfigFormat{formatting.NewFromString(s)}
+}
+
+type ConfigColor struct {
+	c string
+}
+
+var hexColorRe = regexp.MustCompile(`^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$`)
+
+func (c *ConfigColor) UnmarshalYAML(node *yaml.Node) (err error) {
+	var v string
+	if err = node.Decode(&v); err != nil {
+		return
+	}
+	if hexColorRe.FindString(v) == "" {
+		return errors.New("Invalid hex color")
+	}
+	c.c = v
+	return
+}
+
+func (c *ConfigColor) String() string {
+	return c.c
+}
+
+type CommonBlockletConfig struct {
+	Color *ConfigColor `yaml:"color,omitempty"`
 }

@@ -159,7 +159,6 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 	if err := b.AddMatchSignalContext(
 		ctx,
 		dbus.WithMatchSender(upowerDbusDest),
-		dbus.WithMatchInterface(dbusGetProperty),
 		dbus.WithMatchMember("PropertiesChanged"),
 	); err != nil {
 		Log.Print(err)
@@ -186,13 +185,15 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 }
 
 func (t *BatteryBlock) Render() []I3barBlock {
-	return []I3barBlock{{
-		FullText: t.Format.Expand(formatting.NamedArgs{
-			"percentage":    t.percentage,
-			"time_to_empty": t.timeToEmpty,
-			"state_icon":    t.getStateIcon(),
-		}),
-	}}
+	args := formatting.NamedArgs{
+		"percentage":    t.percentage,
+		"time_to_empty": t.timeToEmpty,
+		"state_icon":    t.getStateIcon(),
+	}
+	if t.state == upowerStateCharging {
+		args["is_charging"] = t.StateIcons["charging"]
+	}
+	return []I3barBlock{{FullText: t.Format.Expand(args)}}
 }
 
 func init() {

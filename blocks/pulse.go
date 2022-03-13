@@ -11,19 +11,16 @@ import (
 )
 
 type PulseConfig struct {
-	SinkFormat   *ConfigFormat `yaml:"sink_format"`
-	SourceFormat *ConfigFormat `yaml:"source_format"`
-}
-
-type NodeInfo struct {
-	Volume uint32
-	Icon   string
+	Node    string        `yaml:"node"`
+	Format  *ConfigFormat `yaml:"format"`
+	OnClick *string       `yaml:"on_click,omitempty"`
 }
 
 type PulseBlock struct {
 	PulseConfig
-	client       *pulseaudio.Client
-	sink, source NodeInfo
+	client *pulseaudio.Client
+	Volume uint32
+	Icon   string
 }
 
 func NewPulseBlock() I3barBlocklet {
@@ -34,50 +31,45 @@ func volumeToPercentage(v uint32) uint32 {
 	return uint32(math.Round(float64(v) / 0xffff * 100))
 }
 
+// Updates from pulse server are bursting, so some throttling is required
+const throttleDuration = time.Millisecond * 50
+
 func (c *PulseBlock) fetchInfo() {
-	srv, _ := c.client.ServerInfo()
-	sinks, _ := c.client.Sinks()
-	for _, sink := range sinks {
-		if sink.Name == srv.DefaultSink {
-			c.sink.Volume = volumeToPercentage(sink.Cvolume[0])
-			if sink.Muted {
-				c.sink.Icon = "ﱝ "
-				break
-			}
-			for _, port := range sink.Ports {
-				if port.Name == sink.ActivePortName {
-					switch port.Description {
-					case "Speakers":
-						c.sink.Icon = "墳"
-					case "Headphones":
-						c.sink.Icon = " "
-					case "Headset":
-						c.sink.Icon = " "
-					}
-				}
-			}
+	switch c.Node {
+	case "source":
+		source, _ := c.getCurrentSource()
+		c.Volume = volumeToPercentage(source.Cvolume[0])
+		if source.Muted {
+			c.Icon = " "
 			break
 		}
-	}
-	sources, _ := c.client.Sources()
-	for _, source := range sources {
-		if source.Name == srv.DefaultSource {
-			c.source.Volume = volumeToPercentage(source.Cvolume[0])
-			if source.Muted {
-				c.source.Icon = " "
-				break
+		for _, port := range source.Ports {
+			if port.Name == source.ActivePortName {
+				c.Icon = ""
 			}
-			for _, port := range source.Ports {
-				if port.Name == source.ActivePortName {
-					c.source.Icon = ""
-				}
-			}
+		}
+	case "sink":
+		sink, _ := c.getCurrentSink()
+		c.Volume = volumeToPercentage(sink.Cvolume[0])
+		if sink.Muted {
+			c.Icon = "ﱝ "
 			break
 		}
+		for _, port := range sink.Ports {
+			if port.Name == sink.ActivePortName {
+				switch port.Description {
+				case "Speakers":
+					c.Icon = "墳"
+				case "Headphones":
+					c.Icon = " "
+				case "Headset":
+					c.Icon = " "
+				}
+			}
+		}
+		break
 	}
 }
-
-const throttleDuration = time.Millisecond * 50
 
 func (c *PulseBlock) getCurrentSink() (*pulseaudio.Sink, error) {
 	srv, err := c.client.ServerInfo()
@@ -114,7 +106,11 @@ func (c *PulseBlock) getCurrentSource() (*pulseaudio.Source, error) {
 }
 
 func (c *PulseBlock) Run(ch UpdateChan, ctx context.Context) {
-	client, _ := pulseaudio.NewClient()
+	client, err := pulseaudio.NewClient()
+	if err != nil {
+		Log.Print(err)
+		return
+	}
 	defer client.Close()
 	c.client = client
 	upd, _ := client.Updates()
@@ -140,36 +136,42 @@ func (c *PulseBlock) GetConfig() interface{} {
 func (t *PulseBlock) Render() []I3barBlock {
 	return []I3barBlock{
 		{
-			FullText: t.SinkFormat.Expand(formatting.NamedArgs{
-				"sink_icon":   t.sink.Icon,
-				"sink_volume": t.sink.Volume,
+			FullText: t.Format.Expand(formatting.NamedArgs{
+				"icon":   t.Icon,
+				"volume": t.Volume,
 			}),
 			Name: "sink",
-		},
-		{
-			FullText: t.SourceFormat.Expand(formatting.NamedArgs{
-				"source_icon":   t.source.Icon,
-				"source_volume": t.source.Volume,
-			}),
-			Name: "source",
 		},
 	}
 }
 
-func (t *PulseBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
-	n := e.CustomBlockletName()
-	switch n {
+func (t *PulseBlock) changeVolume(delta int) {
+	d := float32(delta) * 0.01
+	switch t.Node {
 	case "sink":
-		switch e.Button {
-		case ButtonScrollDown:
-			s, _ := t.getCurrentSink()
-			t.client.SetSinkVolume(s.Name, float32(s.Cvolume[0])/0xffff+0.01)
-		case ButtonScrollUp:
-			s, _ := t.getCurrentSink()
-			t.client.SetSinkVolume(s.Name, float32(s.Cvolume[0])/0xffff-0.01)
-		}
+		s, _ := t.getCurrentSink()
+		vol := float32(s.Cvolume[0]) / 0xffff
+		vol += d
+		t.client.SetSinkVolume(s.Name, vol)
 	case "source":
-		// TODO: change mic volume
+		// s, _ := t.getCurrentSource()
+		// vol := float32(s.Cvolume[0]) / 0xffff
+		Log.Println("Changing source volume it not supported")
+	}
+}
+
+func (t *PulseBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
+	switch e.Button {
+	case ButtonScrollDown:
+		t.changeVolume(-1)
+	case ButtonScrollUp:
+		t.changeVolume(+1)
+	}
+	if t.OnClick != nil {
+		onClickCmd := e.ShellCommand(*t.OnClick, ctx)
+		if err := onClickCmd.Run(); err != nil {
+			Log.Print(err)
+		}
 	}
 }
 
