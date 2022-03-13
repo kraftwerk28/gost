@@ -51,10 +51,10 @@ blocks:
   #     awk -f ~/.config/waybar/cputemp.awk <(sensors)
   #   json: true
 
-  # - <<: *bat_common
-  #   name: battery
-  #   format: " {percentage:3*%}"
-  #   upower_device: keyboard_hid_dco2co26o0co73o0b_battery
+  - <<: *bat_common
+    name: battery
+    format: " {percentage:3*%}"
+    upower_device: keyboard_hid_dco2co26o0co73o0b_battery
 
   - <<: *bat_common
     urgent_level: 25

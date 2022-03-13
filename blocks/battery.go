@@ -41,6 +41,7 @@ type BatteryBlock struct {
 	state       uint32
 	dbusConn    *dbus.Conn
 	propMap     map[string]interface{}
+	available   bool
 }
 
 func NewBatteryBlock() I3barBlocklet {
@@ -131,12 +132,18 @@ func (t *BatteryBlock) findLaptopBattery(ctx context.Context) (p dbus.ObjectPath
 	return
 }
 
-func (t *BatteryBlock) loadInitial(b *dbus.Conn) {
-	obj := b.Object(upowerDbusDest, dbus.ObjectPath(t.UpowerDevice))
+func (t *BatteryBlock) loadInitial() (err error) {
+	obj := t.dbusConn.Object(upowerDbusDest, dbus.ObjectPath(t.UpowerDevice))
 	iface := upowerDbusDest + ".Device"
 	for k, v := range t.propMap {
-		obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, k).Store(v)
+		if err = obj.Call(
+			"org.freedesktop.DBus.Properties.Get", 0,
+			iface, k,
+		).Store(v); err != nil {
+			return
+		}
 	}
+	return
 }
 
 func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
@@ -160,6 +167,7 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 	if err := b.AddMatchSignalContext(
 		ctx,
 		dbus.WithMatchSender(upowerDbusDest),
+		dbus.WithMatchObjectPath(dbus.ObjectPath(t.UpowerDevice)),
 		dbus.WithMatchMember("PropertiesChanged"),
 	); err != nil {
 		Log.Print(err)
@@ -167,13 +175,21 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 	c := make(chan *dbus.Signal)
 	b.Signal(c)
-	t.loadInitial(b)
+	if err := t.loadInitial(); err != nil {
+		Log.Print(err)
+		return
+		// t.available = true
+	}
 	ch.SendUpdate()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case s := <-c:
+			// if !t.available {
+			// 	t.available = t.loadInitial() == nil
+			// 	break
+			// }
 			changedProps := s.Body[1].(map[string]dbus.Variant)
 			for k, v := range changedProps {
 				if ref, ok := t.propMap[k]; ok {

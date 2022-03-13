@@ -13,13 +13,13 @@ import (
 type PulseIconsConfig struct {
 	Devices     map[string]string `yaml:"devices"`
 	SinkMuted   string            `yaml:"sink_muted"`
-	SourceMuted string            `yaml:"sink_muted"`
+	SourceMuted string            `yaml:"source_muted"`
 }
 
 type PulseConfig struct {
 	Node    string           `yaml:"node"`
 	Format  *ConfigFormat    `yaml:"format"`
-	OnClick *string          `yaml:"on_click,omitempty"`
+	OnClick *string          `yaml:"on_click"`
 	Icons   PulseIconsConfig `yaml:"icons"`
 }
 

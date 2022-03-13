@@ -14,8 +14,9 @@ var objectManagerOutput map[dbus.ObjectPath](map[string](map[string]dbus.Variant
 // const dbusGetProperty = "org.freedesktop.DBus.Properties.Get"
 
 type BluezBlockConfig struct {
-	DeviceFormat *ConfigFormat     `yaml:"device_format"`
-	DeviceIcons  map[string]string `yaml:"device_icons"`
+	Device string            `yaml:"mac"`
+	Format *ConfigFormat     `yaml:"format"`
+	Icons  map[string]string `yaml:"icons"`
 }
 
 type BluezBlock struct {
