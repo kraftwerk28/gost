@@ -10,10 +10,17 @@ import (
 	"github.com/lawl/pulseaudio"
 )
 
+type PulseIconsConfig struct {
+	Devices     map[string]string `yaml:"devices"`
+	SinkMuted   string            `yaml:"sink_muted"`
+	SourceMuted string            `yaml:"sink_muted"`
+}
+
 type PulseConfig struct {
-	Node    string        `yaml:"node"`
-	Format  *ConfigFormat `yaml:"format"`
-	OnClick *string       `yaml:"on_click,omitempty"`
+	Node    string           `yaml:"node"`
+	Format  *ConfigFormat    `yaml:"format"`
+	OnClick *string          `yaml:"on_click,omitempty"`
+	Icons   PulseIconsConfig `yaml:"icons"`
 }
 
 type PulseBlock struct {
@@ -28,7 +35,8 @@ func NewPulseBlock() I3barBlocklet {
 }
 
 func volumeToPercentage(v uint32) uint32 {
-	return uint32(math.Round(float64(v) / 0xffff * 100))
+	ratio := float64(v) / 0xffff
+	return uint32(math.Round(ratio * 100))
 }
 
 // Updates from pulse server are bursting, so some throttling is required
@@ -40,34 +48,28 @@ func (c *PulseBlock) fetchInfo() {
 		source, _ := c.getCurrentSource()
 		c.Volume = volumeToPercentage(source.Cvolume[0])
 		if source.Muted {
-			c.Icon = " "
+			c.Icon = c.Icons.SourceMuted
 			break
 		}
 		for _, port := range source.Ports {
 			if port.Name == source.ActivePortName {
-				c.Icon = ""
+				c.Icon = c.Icons.Devices[port.Description]
+				break
 			}
 		}
 	case "sink":
 		sink, _ := c.getCurrentSink()
 		c.Volume = volumeToPercentage(sink.Cvolume[0])
 		if sink.Muted {
-			c.Icon = "ﱝ "
+			c.Icon = c.Icons.SinkMuted
 			break
 		}
 		for _, port := range sink.Ports {
 			if port.Name == sink.ActivePortName {
-				switch port.Description {
-				case "Speakers":
-					c.Icon = "墳"
-				case "Headphones":
-					c.Icon = " "
-				case "Headset":
-					c.Icon = " "
-				}
+				c.Icon = c.Icons.Devices[port.Description]
+				break
 			}
 		}
-		break
 	}
 }
 

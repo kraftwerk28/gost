@@ -57,6 +57,7 @@ blocks:
   #   upower_device: keyboard_hid_dco2co26o0co73o0b_battery
 
   - <<: *bat_common
+    urgent_level: 25
     name: battery
     format: "{is_charging$}{state_icon}{percentage:3*%}"
 

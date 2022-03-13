@@ -31,6 +31,7 @@ type BatteryBlockConfig struct {
 	UpowerDevice string            `yaml:"upower_device"`
 	StateIcons   map[string]string `yaml:"state_icons"`
 	LevelIcons   []string          `yaml:"level_icons"`
+	UrgentLevel  *int              `yaml:"urgent_level"`
 }
 
 type BatteryBlock struct {
@@ -193,7 +194,11 @@ func (t *BatteryBlock) Render() []I3barBlock {
 	if t.state == upowerStateCharging {
 		args["is_charging"] = t.StateIcons["charging"]
 	}
-	return []I3barBlock{{FullText: t.Format.Expand(args)}}
+	b := I3barBlock{FullText: t.Format.Expand(args)}
+	if t.UrgentLevel != nil && t.percentage <= *t.UrgentLevel {
+		b.Urgent = true
+	}
+	return []I3barBlock{b}
 }
 
 func init() {
