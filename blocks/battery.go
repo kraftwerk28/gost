@@ -52,6 +52,7 @@ func NewBatteryBlock() I3barBlocklet {
 		"TimeToEmpty": &b.timeToEmpty,
 		"State":       &b.state,
 	}
+	b.available = false
 	return &b
 }
 
@@ -164,44 +165,83 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 		t.UpowerDevice = "/org/freedesktop/UPower/devices/" + t.UpowerDevice
 	}
 	defer b.Close()
+
 	if err := b.AddMatchSignalContext(
 		ctx,
-		dbus.WithMatchSender(upowerDbusDest),
 		dbus.WithMatchObjectPath(dbus.ObjectPath(t.UpowerDevice)),
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
 		dbus.WithMatchMember("PropertiesChanged"),
 	); err != nil {
 		Log.Print(err)
 		return
 	}
+	if err := b.AddMatchSignalContext(
+		ctx,
+		dbus.WithMatchObjectPath(upowerDbusBasePath),
+		dbus.WithMatchInterface(upowerDbusDest),
+		dbus.WithMatchMember("DeviceAdded"),
+	); err != nil {
+		Log.Print(err)
+		return
+	}
+	if err := b.AddMatchSignalContext(
+		ctx,
+		dbus.WithMatchObjectPath(upowerDbusBasePath),
+		dbus.WithMatchInterface(upowerDbusDest),
+		dbus.WithMatchMember("DeviceRemoved"),
+	); err != nil {
+		Log.Print(err)
+		return
+	}
+
 	c := make(chan *dbus.Signal)
 	b.Signal(c)
 	if err := t.loadInitial(); err != nil {
+		t.available = false
 		Log.Print(err)
-		return
-		// t.available = true
+	} else {
+		t.available = true
+		ch.SendUpdate()
 	}
-	ch.SendUpdate()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case s := <-c:
-			// if !t.available {
-			// 	t.available = t.loadInitial() == nil
-			// 	break
-			// }
-			changedProps := s.Body[1].(map[string]dbus.Variant)
-			for k, v := range changedProps {
-				if ref, ok := t.propMap[k]; ok {
-					v.Store(ref)
+			if s.Path == dbus.ObjectPath(t.UpowerDevice) {
+				if !t.available {
+					continue
 				}
+				changedProps := s.Body[1].(map[string]dbus.Variant)
+				for k, v := range changedProps {
+					if ref, ok := t.propMap[k]; ok {
+						v.Store(ref)
+					}
+				}
+				ch.SendUpdate()
+			} else if s.Path == upowerDbusBasePath &&
+				s.Name == "org.freedesktop.UPower.DeviceAdded" &&
+				dbus.ObjectPath(t.UpowerDevice) == s.Body[0].(dbus.ObjectPath) {
+				if err := t.loadInitial(); err != nil {
+					Log.Print(err)
+				} else {
+					t.available = true
+					ch.SendUpdate()
+				}
+			} else if s.Path == upowerDbusBasePath &&
+				s.Name == "org.freedesktop.UPower.DeviceRemoved" &&
+				dbus.ObjectPath(t.UpowerDevice) == s.Body[0].(dbus.ObjectPath) {
+				t.available = false
+				ch.SendUpdate()
 			}
-			ch.SendUpdate()
 		}
 	}
 }
 
 func (t *BatteryBlock) Render() []I3barBlock {
+	if !t.available {
+		return nil
+	}
 	args := formatting.NamedArgs{
 		"percentage":    t.percentage,
 		"time_to_empty": t.timeToEmpty,
