@@ -1,3 +1,5 @@
+// This is an example blocklet that doesn't have much sense.
+// Use it as a template.
 package blocks
 
 import (
@@ -14,7 +16,7 @@ type ClickcountConfig struct {
 
 type Clickcount struct {
 	ClickcountConfig
-	clicks uint
+	clicks int
 	ch     UpdateChan
 }
 
@@ -43,7 +45,7 @@ func (t *Clickcount) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	} else {
 		t.clicks++
 	}
-	if t.clicks == 0 {
+	if t.clicks < 0 {
 		t.clicks = 0
 	}
 	t.ch.SendUpdate()
