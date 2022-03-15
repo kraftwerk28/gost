@@ -161,6 +161,7 @@ outerLoop:
 					// Continue emitting JSON
 				case syscall.SIGTERM, syscall.SIGINT:
 					ctxCancel()
+					log.Println("Waiting for blocklets to finish...")
 					c := make(chan struct{})
 					go func() {
 						wg.Wait()
@@ -183,5 +184,5 @@ outerLoop:
 			}
 		}
 	}
-	log.Println("Bye.")
+	log.Println("Auf Wiedersehen.")
 }

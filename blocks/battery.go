@@ -148,9 +148,9 @@ func (t *BatteryBlock) loadInitial() (err error) {
 }
 
 func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
-	b, err := dbus.SystemBus()
+	b, err := dbus.ConnectSystemBus()
 	if err != nil {
-		Log.Print(err)
+		Log.Println("ConnectSystemBus", err)
 		return
 	}
 	t.dbusConn = b

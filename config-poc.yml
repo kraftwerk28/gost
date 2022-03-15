@@ -36,13 +36,21 @@ blocks:
   #   node: source
   #   format: "{icon} {volume}"
 
-  - name: networkmanager
-    format: "{status_icon$}{strength:3*%}"
-    status_icons:
-      connected: "直"
-      disconnected: "睊"
-      connecting: " "
-    primary_only: true
+  # - name: networkmanager
+  #   format: "{status_icon$}{strength:3*%}"
+  #   status_icons:
+  #     connected: "直"
+  #     disconnected: "睊"
+  #     connecting: " "
+  #     no_internet: " "
+  #   primary_only: true
+
+  - name: bluez
+    icons:
+      phone: " "
+      audio-card: " "
+      audio-headset: " "
+      input-keyboard: " "
 
   # - name: cpu
 

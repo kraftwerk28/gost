@@ -2,32 +2,38 @@ package blocks
 
 import (
 	"context"
+	"strings"
 
 	"github.com/godbus/dbus/v5"
 	. "github.com/kraftwerk28/gost/core"
+	"github.com/kraftwerk28/gost/core/formatting"
 )
 
-var objectManagerOutput map[dbus.ObjectPath](map[string](map[string]dbus.Variant))
-
-// const nmDbusDest = "org.freedesktop.NetworkManager"
-// const nmDbusBasePath dbus.ObjectPath = "/org/freedesktop/NetworkManager"
-// const dbusGetProperty = "org.freedesktop.DBus.Properties.Get"
+type bluezObjectManagerOutput map[dbus.ObjectPath](map[string](map[string]dbus.Variant))
 
 type BluezBlockConfig struct {
-	Device string            `yaml:"mac"`
-	Format *ConfigFormat     `yaml:"format"`
-	Icons  map[string]string `yaml:"icons"`
+	Device       string            `yaml:"mac"`
+	DeviceFormat *ConfigFormat     `yaml:"device_format"`
+	Icons        map[string]string `yaml:"icons"`
+	ExcludeMac   []string          `yaml:"exclude"`
+}
+
+type bluezDevice struct {
+	path      dbus.ObjectPath
+	connected bool
+	icon      string
+	name      string
 }
 
 type BluezBlock struct {
 	BluezBlockConfig
-	dbus *dbus.Conn
+	dbus    *dbus.Conn
+	devices map[dbus.ObjectPath]*bluezDevice
 }
 
 func NewBluezBlock() I3barBlocklet {
-	b := NetworkManagerBlock{}
-	b.Format = NewConfigFormatFromString("{state_icon} {percentage*%}")
-	b.propMap = map[string]interface{}{}
+	b := BluezBlock{}
+	b.DeviceFormat = NewConfigFormatFromString("{icon}")
 	return &b
 }
 
@@ -35,49 +41,131 @@ func (t *BluezBlock) GetConfig() interface{} {
 	return &t.BluezBlockConfig
 }
 
+func (b *BluezBlock) isExcluded(addr string) bool {
+	for _, p := range b.ExcludeMac {
+		if p == addr {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *BluezBlock) loadDevices() (err error) {
+	var bluezObjects bluezObjectManagerOutput
+	if err = b.dbus.Object("org.bluez", "/").Call(
+		"org.freedesktop.DBus.ObjectManager.GetManagedObjects", 0,
+	).Store(&bluezObjects); err != nil {
+		return
+	}
+	b.devices = make(map[dbus.ObjectPath]*bluezDevice)
+	for path, v := range bluezObjects {
+		if info, ok := v["org.bluez.Device1"]; ok {
+			var addr, icon, name string
+			var connected bool
+			info["Address"].Store(&addr)
+			if b.isExcluded(addr) {
+				continue
+			}
+			if i, ok := info["Icon"]; ok {
+				i.Store(&icon)
+			}
+			info["Name"].Store(&name)
+			info["Connected"].Store(&connected)
+			b.devices[path] = &bluezDevice{path, connected, icon, name}
+		}
+	}
+	return
+}
+
+func (t *BluezBlock) addSignals() (err error) {
+	b := t.dbus
+	if err = b.AddMatchSignal(
+		dbus.WithMatchPathNamespace("/org/bluez"),
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchMember("PropertiesChanged"),
+		dbus.WithMatchArg(0, "org.bluez.Device1"),
+	); err != nil {
+		return
+	}
+	if err = b.AddMatchSignal(
+		dbus.WithMatchObjectPath("/"),
+		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+		dbus.WithMatchMember("InterfaceAdded"),
+	); err != nil {
+		return
+	}
+	if err = b.AddMatchSignal(
+		dbus.WithMatchObjectPath("/"),
+		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+		dbus.WithMatchMember("InterfaceRemoved"),
+	); err != nil {
+		return
+	}
+	return
+}
+
 func (t *BluezBlock) Run(ch UpdateChan, ctx context.Context) {
-	b, err := dbus.SystemBus()
+	b, err := dbus.ConnectSystemBus()
 	if err != nil {
 		Log.Print(err)
 		return
 	}
 	defer b.Close()
 	t.dbus = b
+	if err := t.addSignals(); err != nil {
+		Log.Print(err)
+		return
+	}
+	if err := t.loadDevices(); err != nil {
+		Log.Print(err)
+	} else {
+		ch.SendUpdate()
+	}
 	c := make(chan *dbus.Signal)
 	b.Signal(c)
-	ch.SendUpdate()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case s := <-c:
-			Log.Println(s)
-			// s.Path -> path to AccessPoint
-			// changedProps := s.Body[1].(map[string]dbus.Variant)
+			Log.Printf("[bluez] %+v\n", s)
+			switch s.Name {
+			case "org.freedesktop.DBus.ObjectManager.InterfaceAdded",
+				"org.freedesktop.DBus.ObjectManager.InterfaceRemoved":
+				t.loadDevices()
+				ch.SendUpdate()
+			case "org.freedesktop.DBus.Properties.PropertiesChanged":
+				if t.devices[s.Path] == nil {
+					t.loadDevices()
+					ch.SendUpdate()
+					break
+				}
+				props := s.Body[1].(map[string]dbus.Variant)
+				if conn, ok := props["Connected"]; ok {
+					var connected bool
+					conn.Store(&connected)
+					t.devices[s.Path].connected = connected
+					ch.SendUpdate()
+				}
+			}
 		}
 	}
 }
 
 func (b *BluezBlock) Render() []I3barBlock {
-	return nil
-	// if b.state == nmStateConnectedGlobal {
-	// 	c := b.connections[b.currentConnection]
-	// 	ipMarshalled, _ := c.ipv4.MarshalText()
-	// 	return []I3barBlock{{
-	// 		FullText: b.Format.Expand(formatting.NamedArgs{
-	// 			"ssid":        c.ssid,
-	// 			"strength":    c.strength,
-	// 			"ipv4":        string(ipMarshalled),
-	// 			"status_icon": b.getStatusIcon(),
-	// 		}),
-	// 	}}
-	// } else {
-	// 	return []I3barBlock{{
-	// 		FullText: b.Format.Expand(formatting.NamedArgs{
-	// 			"status_icon": b.getStatusIcon(),
-	// 		}),
-	// 	}}
-	// }
+	labels := []string{}
+	for _, d := range b.devices {
+		if d.connected {
+			args := formatting.NamedArgs{
+				"icon": b.Icons[d.icon],
+				"name": d.name,
+			}
+			labels = append(labels, b.DeviceFormat.Expand(args))
+		}
+	}
+	return []I3barBlock{{
+		FullText: strings.Join(labels, " "),
+	}}
 }
 
 func init() {

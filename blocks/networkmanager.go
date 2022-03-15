@@ -183,6 +183,8 @@ func (t *NetworkManagerBlock) getStatusIcon() string {
 	switch t.state {
 	case nmStateConnectedGlobal:
 		return t.StatusIcons["connected"]
+	case nmStateConnectedLocal:
+		return t.StatusIcons["no_internet"]
 	case nmStateConnecting:
 		return t.StatusIcons["connecting"]
 	default:
@@ -191,9 +193,9 @@ func (t *NetworkManagerBlock) getStatusIcon() string {
 }
 
 func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
-	b, err := dbus.SystemBus()
+	b, err := dbus.ConnectSystemBus()
 	if err != nil {
-		Log.Print(err)
+		Log.Println("ConnectSystemBus", err)
 		return
 	}
 	defer b.Close()
@@ -215,14 +217,9 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 			return
 		case s := <-c:
 			// s.Path -> path to AccessPoint
-			Log.Printf("%+v\n", s)
 			if len(t.connections) == 0 {
-				// Was not connected, maybe now it is...
 				t.loadConnections()
 				ch.SendUpdate()
-				continue
-			}
-			if len(s.Body) < 1 {
 				continue
 			}
 			changedProps := s.Body[1].(map[string]dbus.Variant)

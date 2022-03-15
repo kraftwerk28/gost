@@ -45,7 +45,10 @@ const throttleDuration = time.Millisecond * 50
 func (c *PulseBlock) fetchInfo() {
 	switch c.Node {
 	case "source":
-		source, _ := c.getCurrentSource()
+		source, err := c.getCurrentSource()
+		if err != nil {
+			Log.Print(err)
+		}
 		c.Volume = volumeToPercentage(source.Cvolume[0])
 		if source.Muted {
 			c.Icon = c.Icons.SourceMuted
@@ -58,7 +61,10 @@ func (c *PulseBlock) fetchInfo() {
 			}
 		}
 	case "sink":
-		sink, _ := c.getCurrentSink()
+		sink, err := c.getCurrentSink()
+		if err != nil {
+			Log.Print(err)
+		}
 		c.Volume = volumeToPercentage(sink.Cvolume[0])
 		if sink.Muted {
 			c.Icon = c.Icons.SinkMuted
@@ -115,7 +121,11 @@ func (c *PulseBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 	defer client.Close()
 	c.client = client
-	upd, _ := client.Updates()
+	upd, err := client.Updates()
+	if err != nil {
+		Log.Print(err)
+		return
+	}
 	c.fetchInfo()
 	throttleTimer := time.NewTimer(throttleDuration)
 	for {

@@ -15,6 +15,7 @@ type BlockletMgr struct {
 	blocklet    I3barBlocklet
 	renderCache []I3barBlock
 	appConfig   *AppConfig
+	isError     bool
 }
 
 func NewBlockletMgr(
@@ -28,6 +29,19 @@ func NewBlockletMgr(
 }
 
 func (bm *BlockletMgr) invalidateCache() {
+	if bm.isError {
+		if len(bm.renderCache) > 0 {
+			bm.renderCache = []I3barBlock{{
+				FullText: fmt.Sprintf("E [%s]", bm.name),
+				Color:    "#ff0000",
+			}}
+		} else {
+			for i := range bm.renderCache {
+				bm.renderCache[i].Color = "#ff0000"
+			}
+		}
+		return
+	}
 	blocks := bm.blocklet.Render()
 	for i := range blocks {
 		if blocks[i].Name == "" {
@@ -60,6 +74,13 @@ func (bm *BlockletMgr) Run(ch chan string, ctx context.Context, wg *sync.WaitGro
 	defer wg.Done()
 	bm.initLogger()
 	uc := UpdateChan{ch, bm.name}
+	defer func() {
+		if r := recover(); r != nil {
+			bm.isError = true
+			bm.invalidateCache()
+			uc.SendUpdate()
+		}
+	}()
 	bm.blocklet.Run(uc, ctx)
 }
 
