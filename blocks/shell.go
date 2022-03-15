@@ -38,7 +38,7 @@ func (t *ShellBlock) newCmd(ctx context.Context) *exec.Cmd {
 	return exec.CommandContext(ctx, "sh", "-c", t.Command)
 }
 
-func postProcessCmdOutput(o []byte) string {
+func processCmdOutput(o []byte) string {
 	return strings.TrimSpace(string(o))
 }
 
@@ -50,7 +50,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 			if err != nil {
 				Log.Print(err)
 			} else {
-				t.lastText = postProcessCmdOutput(outp)
+				t.lastText = processCmdOutput(outp)
 				ch.SendUpdate()
 			}
 			select {
@@ -66,9 +66,9 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 			cmd := t.newCmd(ctx)
 			outp, err := cmd.Output()
 			if err != nil {
-				Log.Println(err)
+				Log.Printf("Command `%s` errored: %s", t.Command, err)
 			} else {
-				t.lastText = postProcessCmdOutput(outp)
+				t.lastText = processCmdOutput(outp)
 				ch.SendUpdate()
 			}
 			select {
@@ -91,7 +91,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 			Log.Print(err)
 		}
 		for sc.Scan() {
-			t.lastText = postProcessCmdOutput(sc.Bytes())
+			t.lastText = processCmdOutput(sc.Bytes())
 			ch.SendUpdate()
 		}
 		if err := sc.Err(); err != nil {

@@ -76,6 +76,8 @@ func (bm *BlockletMgr) Run(ch chan string, ctx context.Context, wg *sync.WaitGro
 	uc := UpdateChan{ch, bm.name}
 	defer func() {
 		if r := recover(); r != nil {
+			Log.Printf("error in blocklet %s:", bm.name)
+			Log.Print(r)
 			bm.isError = true
 			bm.invalidateCache()
 			uc.SendUpdate()

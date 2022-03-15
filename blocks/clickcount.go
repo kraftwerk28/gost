@@ -21,7 +21,9 @@ type Clickcount struct {
 }
 
 func NewClickcountBlock() I3barBlocklet {
-	return &Clickcount{}
+	b := Clickcount{}
+	b.Format = NewConfigFormatFromString("{clicks}")
+	return &b
 }
 
 func (c *Clickcount) Run(ch UpdateChan, ctx context.Context) {
