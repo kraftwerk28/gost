@@ -13,16 +13,16 @@ type bluezObjectManagerOutput map[dbus.ObjectPath](map[string](map[string]dbus.V
 
 type BluezBlockConfig struct {
 	Device       string            `yaml:"mac"`
+	Format       *ConfigFormat     `yaml:"format"`
 	DeviceFormat *ConfigFormat     `yaml:"device_format"`
 	Icons        map[string]string `yaml:"icons"`
 	ExcludeMac   []string          `yaml:"exclude"`
 }
 
 type bluezDevice struct {
-	path      dbus.ObjectPath
-	connected bool
-	icon      string
-	name      string
+	path              dbus.ObjectPath
+	connected         bool
+	name, alias, icon string
 }
 
 type BluezBlock struct {
@@ -60,7 +60,7 @@ func (b *BluezBlock) loadDevices() (err error) {
 	b.devices = make(map[dbus.ObjectPath]*bluezDevice)
 	for path, v := range bluezObjects {
 		if info, ok := v["org.bluez.Device1"]; ok {
-			var addr, icon, name string
+			var addr, name, alias, icon string
 			var connected bool
 			info["Address"].Store(&addr)
 			if b.isExcluded(addr) {
@@ -70,8 +70,9 @@ func (b *BluezBlock) loadDevices() (err error) {
 				i.Store(&icon)
 			}
 			info["Name"].Store(&name)
+			info["Alias"].Store(&alias)
 			info["Connected"].Store(&connected)
-			b.devices[path] = &bluezDevice{path, connected, icon, name}
+			b.devices[path] = &bluezDevice{path, connected, name, alias, icon}
 		}
 	}
 	return
@@ -157,14 +158,17 @@ func (b *BluezBlock) Render() []I3barBlock {
 	for _, d := range b.devices {
 		if d.connected {
 			args := formatting.NamedArgs{
-				"icon": b.Icons[d.icon],
-				"name": d.name,
+				"icon":  b.Icons[d.icon],
+				"name":  d.name,
+				"alias": d.alias,
 			}
 			labels = append(labels, b.DeviceFormat.Expand(args))
 		}
 	}
 	return []I3barBlock{{
-		FullText: strings.Join(labels, " "),
+		FullText: b.Format.Expand(formatting.NamedArgs{
+			"devices": strings.Join(labels, " "),
+		}),
 	}}
 }
 
