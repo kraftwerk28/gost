@@ -1,6 +1,6 @@
-# gost - a JSON feeder for i3bar/swaybar
+# gost
 
-### i3wm/sway bar json feeder
+### A JSON feeder for i3bar/swaybar
 
 
 ## Documentation
