@@ -10,9 +10,11 @@ import (
 
 type TimeBlock struct{}
 
-func NewBlock() core.I3barBlocklet {
+func NewTimeBlock() core.I3barBlocklet {
 	return &TimeBlock{}
 }
+
+var NewBlock core.I3barBlockletCtor = NewTimeBlock
 
 func (t *TimeBlock) Run(ch core.UpdateChan, ctx context.Context) {
 	ticker := time.Tick(time.Second)

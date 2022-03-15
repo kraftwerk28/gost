@@ -39,22 +39,26 @@ func (cfg *AppConfig) CreateManagers(ctx context.Context) []*BlockletMgr {
 	for _, c := range cfg.Blocks {
 		var ctor I3barBlockletCtor
 		if c.Name == "plugin" {
-			handle, err := plugin.Open(c.Path)
-			if err != nil {
-				log.Println("Failed to load plugin:")
-				log.Print(err)
+			var err error
+			var handle *plugin.Plugin
+			var sym interface{}
+			if handle, err = plugin.Open(c.Path); err != nil {
+				log.Println("Failed to load plugin:", err)
 				continue
 			}
-			sym, err := handle.Lookup("NewBlock")
-			if err != nil {
-				log.Println("Plugin must have `func NewBlock() I3barBlocklet`:")
-				log.Print(err)
+			if sym, err = handle.Lookup("NewBlock"); err != nil {
+				log.Println(
+					"Plugin must have `func NewBlock() I3barBlocklet`:",
+					err,
+				)
 				continue
 			}
 			if c, ok := sym.(*I3barBlockletCtor); ok {
 				ctor = *c
 			} else {
-				log.Println("Bad constructor")
+				log.Println("Bad constructor. The plugin must have the following line:")
+				log.Println("`var NewBlock core.I3barBlockletCtor = newFooBlock`,")
+				log.Println("where `newFooBlock` is your blocklet constructor.")
 				continue
 			}
 		} else if ct := GetBuiltin(c.Name); ct != nil {
