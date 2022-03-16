@@ -7,8 +7,10 @@
 
 TBD...
 
+Meanwhile, see the example [configuration](doc/example-config.yml).
+
 
 ## TODO:
 
-- [ ] write a GitHub action for compiling & publishing (in a separate branch)
+- [ ] Create a GitHub action for compiling & publishing (in a separate branch)
       plugins from [contrib](./contrib)
