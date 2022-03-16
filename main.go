@@ -113,20 +113,16 @@ outerLoop:
 		}
 		managers := cfg.CreateManagers(ctx)
 		wg.Add(len(managers))
-		listeners := make([]*core.BlockletMgr, 0, len(managers))
 		updateChan := make(chan string)
 		for _, m := range managers {
 			go m.Run(updateChan, ctx, wg)
-			if m.IsListener() {
-				listeners = append(listeners, m)
-			}
 		}
 		go func() {
 		loop:
 			for {
 				select {
 				case e := <-eventChan:
-					for _, m := range listeners {
+					for _, m := range managers {
 						m.ProcessEvent(e, ctx)
 					}
 				case <-ctx.Done():

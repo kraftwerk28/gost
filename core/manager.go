@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 	"sync"
 )
@@ -97,12 +98,31 @@ func (bm *BlockletMgr) matchesEvent(e *I3barClickEvent) bool {
 	return strings.HasPrefix(e.Name, bm.name)
 }
 
-func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent, ctx context.Context) bool {
-	if bm.matchesEvent(e) {
-		if b, ok := bm.blocklet.(I3barBlockletListener); ok {
-			b.OnEvent(e, ctx)
-			return true
+func (bm *BlockletMgr) getBaseConfig() *BaseBlockletConfig {
+	if bc, ok := bm.blocklet.(I3barBlockletConfigurable); ok {
+		if c, ok := bc.GetConfig().(BaseBlockletConfigIface); ok {
+			return c.Get()
 		}
+	}
+	return nil
+}
+
+func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent, ctx context.Context) bool {
+	if !bm.matchesEvent(e) {
+		return false
+	}
+	if cfg := bm.getBaseConfig(); cfg != nil {
+		if cfg.OnClick != nil {
+			cmd := e.ShellCommand(*cfg.OnClick, ctx)
+			cerr := cmd.Run()
+			if err, ok := cerr.(*exec.ExitError); ok {
+				Log.Printf("%s\n", err.Stderr)
+			}
+		}
+	}
+	if b, ok := bm.blocklet.(I3barBlockletListener); ok {
+		b.OnEvent(e, ctx)
+		return true
 	}
 	return false
 }

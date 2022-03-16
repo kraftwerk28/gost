@@ -17,10 +17,10 @@ type PulseIconsConfig struct {
 }
 
 type PulseConfig struct {
-	Node    string           `yaml:"node"`
-	Format  *ConfigFormat    `yaml:"format"`
-	OnClick *string          `yaml:"on_click"`
-	Icons   PulseIconsConfig `yaml:"icons"`
+	BaseBlockletConfig `yaml:",inline"`
+	Node               string           `yaml:"node"`
+	Format             *ConfigFormat    `yaml:"format"`
+	Icons              PulseIconsConfig `yaml:"icons"`
 }
 
 type PulseBlock struct {
@@ -42,10 +42,13 @@ func volumeToPercentage(v uint32) uint32 {
 // Updates from pulse server are bursting, so some throttling is required
 const throttleDuration = time.Millisecond * 50
 
-func (c *PulseBlock) fetchInfo() {
+func (c *PulseBlock) fetchInfo() bool {
 	switch c.Node {
 	case "source":
 		source, err := c.getCurrentSource()
+		if source == nil {
+			return false
+		}
 		if err != nil {
 			Log.Print(err)
 		}
@@ -62,6 +65,9 @@ func (c *PulseBlock) fetchInfo() {
 		}
 	case "sink":
 		sink, err := c.getCurrentSink()
+		if sink == nil {
+			return false
+		}
 		if err != nil {
 			Log.Print(err)
 		}
@@ -77,6 +83,7 @@ func (c *PulseBlock) fetchInfo() {
 			}
 		}
 	}
+	return true
 }
 
 func (c *PulseBlock) getCurrentSink() (*pulseaudio.Sink, error) {
@@ -133,8 +140,9 @@ func (c *PulseBlock) Run(ch UpdateChan, ctx context.Context) {
 		case <-upd:
 			throttleTimer.Reset(throttleDuration)
 		case <-throttleTimer.C:
-			c.fetchInfo()
-			ch.SendUpdate()
+			if c.fetchInfo() {
+				ch.SendUpdate()
+			}
 		case <-ctx.Done():
 			return
 		}
@@ -178,12 +186,6 @@ func (t *PulseBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
 		t.changeVolume(-1)
 	case ButtonScrollUp:
 		t.changeVolume(+1)
-	}
-	if t.OnClick != nil {
-		onClickCmd := e.ShellCommand(*t.OnClick, ctx)
-		if err := onClickCmd.Run(); err != nil {
-			Log.Print(err)
-		}
 	}
 }
 

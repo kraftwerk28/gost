@@ -16,7 +16,7 @@ func NewIpcClient() (*IpcClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &IpcClient{l}, nil
+	return &IpcClient{conn: l}, nil
 }
 
 func (s *IpcClient) Recv() (IpcMsgType, interface{}, error) {

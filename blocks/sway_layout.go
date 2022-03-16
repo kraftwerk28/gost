@@ -39,15 +39,6 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 		payload interface{}
 	}
 	evc := make(chan IpcChanValue)
-	go func() {
-		for {
-			t, d, err := ipcClient.Recv()
-			if err != nil {
-				break
-			}
-			evc <- IpcChanValue{t, d}
-		}
-	}()
 	s.ipc = ipcClient
 	var err error
 	var res interface{}
@@ -61,7 +52,6 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 		if device.Type == "keyboard" {
 			s.currentLayoutIndex = device.XkbActiveLayoutIndex
 			s.layouts = device.XkbLayoutNames
-			ch.SendUpdate()
 			break
 		}
 	}
@@ -71,6 +61,16 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 	}
 	const throttleDuration = time.Millisecond * 50
 	throttleTimer := time.NewTimer(throttleDuration)
+	ch.SendUpdate()
+	go func() {
+		for {
+			if t, d, err := ipcClient.Recv(); err == nil {
+				evc <- IpcChanValue{t, d}
+			} else {
+				break
+			}
+		}
+	}()
 	for {
 		select {
 		case <-throttleTimer.C:

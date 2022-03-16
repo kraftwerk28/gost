@@ -27,9 +27,10 @@ const (
 )
 
 type NetworkManagerBlockConfig struct {
-	Format      *ConfigFormat     `yaml:"format"`
-	PrimaryOnly bool              `yaml:"primary_only,omitempty"`
-	StatusIcons map[string]string `yaml:"status_icons"`
+	BaseBlockletConfig `yaml:",inline"`
+	Format             *ConfigFormat     `yaml:"format"`
+	PrimaryOnly        bool              `yaml:"primary_only,omitempty"`
+	StatusIcons        map[string]string `yaml:"status_icons"`
 }
 
 type NmActiveConnection struct {
@@ -87,7 +88,6 @@ func (t *NetworkManagerBlock) loadConnectionProps(conn *NmActiveConnection) (err
 		return
 	}
 	conn.ssid = string(ssidByte)
-
 	ip4Obj := t.dbus.Object(nmDbusDest, conn.ipv4ConfigPath)
 	var ipv4Addresses [][]uint32
 	if err = ip4Obj.Call(
@@ -180,11 +180,14 @@ func (t *NetworkManagerBlock) addDbusSignals(ctx context.Context) (err error) {
 }
 
 func (t *NetworkManagerBlock) getStatusIcon() string {
+	if len(t.connections) == 0 {
+		return t.StatusIcons["unavailable"]
+	}
 	switch t.state {
 	case nmStateConnectedGlobal:
 		return t.StatusIcons["connected"]
 	case nmStateConnectedLocal:
-		return t.StatusIcons["no_internet"]
+		return t.StatusIcons["connected_local"]
 	case nmStateConnecting:
 		return t.StatusIcons["connecting"]
 	default:

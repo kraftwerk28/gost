@@ -2,7 +2,6 @@ package blocks
 
 import (
 	"context"
-	"os/exec"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -13,12 +12,12 @@ import (
 type bluezObjectManagerOutput map[dbus.ObjectPath](map[string](map[string]dbus.Variant))
 
 type BluezBlockConfig struct {
-	Device       string            `yaml:"mac"`
-	Format       *ConfigFormat     `yaml:"format"`
-	DeviceFormat *ConfigFormat     `yaml:"device_format"`
-	Icons        map[string]string `yaml:"icons"`
-	ExcludeMac   []string          `yaml:"exclude"`
-	OnClick      *string           `yaml:"on_click"`
+	BaseBlockletConfig `yaml:",inline"`
+	Device             string            `yaml:"mac"`
+	Format             *ConfigFormat     `yaml:"format"`
+	DeviceFormat       *ConfigFormat     `yaml:"device_format"`
+	Icons              map[string]string `yaml:"icons"`
+	ExcludeMac         []string          `yaml:"exclude"`
 }
 
 type bluezDevice struct {
@@ -172,16 +171,6 @@ func (b *BluezBlock) Render() []I3barBlock {
 			"devices": strings.Join(labels, " "),
 		}),
 	}}
-}
-
-func (b *BluezBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
-	if b.OnClick != nil {
-		cmd := e.ShellCommand(*b.OnClick, ctx)
-		cerr := cmd.Run()
-		if err, ok := cerr.(*exec.ExitError); ok {
-			Log.Printf("%s\n", err.Stderr)
-		}
-	}
 }
 
 func init() {
