@@ -65,8 +65,11 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 		for {
 			cmd := t.newCmd(ctx)
 			outp, err := cmd.Output()
-			if err != nil {
-				Log.Printf("Command `%s` errored: %s", t.Command, err)
+			if e, ok := err.(*exec.ExitError); ok {
+				Log.Printf(
+					"Command `%s` errored: %s\n%s",
+					t.Command, e, e.Stderr,
+				)
 			} else {
 				t.lastText = processCmdOutput(outp)
 				ch.SendUpdate()

@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/kraftwerk28/gost/blocks/ipc"
@@ -32,14 +33,30 @@ func (s *SwayLayout) GetConfig() interface{} {
 
 func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 	ipcClient, _ := ipc.NewIpcClient()
+	defer ipcClient.Close()
+	type IpcChanValue struct {
+		typ     ipc.IpcMsgType
+		payload interface{}
+	}
+	evc := make(chan IpcChanValue)
 	go func() {
-		<-ctx.Done()
-		ipcClient.Close()
+		for {
+			t, d, err := ipcClient.Recv()
+			if err != nil {
+				break
+			}
+			evc <- IpcChanValue{t, d}
+		}
 	}()
 	s.ipc = ipcClient
 	var err error
+	var res interface{}
 	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)
-	_, res, _ := ipcClient.Recv()
+	_, res, err = ipcClient.Recv()
+	if err != nil {
+		Log.Print(err)
+		return
+	}
 	for _, device := range *res.(*[]ipc.IpcInputDevice) {
 		if device.Type == "keyboard" {
 			s.currentLayoutIndex = device.XkbActiveLayoutIndex
@@ -49,39 +66,37 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 		}
 	}
 	ipcClient.SendRaw(ipc.IpcMsgTypeSubscribe, []byte(`["input"]`))
-	if _, res, err = ipcClient.Recv(); err != nil {
+	if _, _, err = ipcClient.Recv(); err != nil {
 		return
 	}
-	now := time.Now()
+	const throttleDuration = time.Millisecond * 50
+	throttleTimer := time.NewTimer(throttleDuration)
 	for {
-		t, res, err := ipcClient.Recv()
-		if err != nil {
+		select {
+		case <-throttleTimer.C:
+			ch.SendUpdate()
+		case e := <-evc:
+			throttleTimer.Reset(throttleDuration)
+			if e.typ == ipc.IpcEventTypeInput {
+				device := e.payload.(*ipc.InputChange).Input
+				if device.Type == "keyboard" {
+					s.currentLayoutIndex = device.XkbActiveLayoutIndex
+					s.layouts = device.XkbLayoutNames
+				}
+			}
+		case <-ctx.Done():
 			return
 		}
-		if t != ipc.IpcEventTypeInput {
-			continue
-		}
-		device := res.(*ipc.InputChange).Input
-		if device.Type != "keyboard" {
-			continue
-		}
-		s.currentLayoutIndex = device.XkbActiveLayoutIndex
-		s.layouts = device.XkbLayoutNames
-		now2 := time.Now()
-		if now2.Sub(now).Milliseconds() < 1 {
-			continue
-		}
-		now = now2
-		ch.SendUpdate()
 	}
 }
 
 func (s *SwayLayout) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	if e.Button == ButtonRight {
-		s.ipc.SendRaw(
-			ipc.IpcMsgTypeCommand,
-			[]byte(`input * xkb_switch_layout next`),
-		)
+		index := (s.currentLayoutIndex + 1) % len(s.layouts)
+		cmd := fmt.Sprintf(`input type:keyboard xkb_switch_layout %d`, index)
+		if err := s.ipc.SendRaw(ipc.IpcMsgTypeCommand, []byte(cmd)); err != nil {
+			Log.Print(err)
+		}
 	}
 }
 

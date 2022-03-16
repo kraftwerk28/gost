@@ -42,7 +42,9 @@ func (s *IpcClient) Recv() (IpcMsgType, interface{}, error) {
 		case IpcMsgTypeGetInputs:
 			out = &[]IpcInputDevice{}
 		case IpcMsgTypeSubscribe:
-			out = &IpcSubscribeResult{}
+			out = &IpcResult{}
+		case IpcMsgTypeCommand:
+			out = &IpcCmdResult{}
 		}
 	}
 	if err := json.Unmarshal(resBody, out); err != nil {
