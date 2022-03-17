@@ -1,4 +1,4 @@
-version: "3"
+version: "1"
 
 bat_common: &bat_common
   level_icons: ["", "", "", "", ""]
@@ -21,66 +21,72 @@ separator_width: 16
 
 blocks:
 
-  # - name: shell
-  #   command: ~/.config/sway/bar-scripts/weather.py
-  #   on_click: ~/.config/sway/bar-scripts/weather.py open
-  #   interval: 5m
+  - name: shell
+    command: ~/.config/sway/bar-scripts/weather.py
+    on_click: ~/.config/sway/bar-scripts/weather.py open
+    interval: 5m
 
-  # - name: pulseaudio
-  #   node: sink
-  #   format: "{icon}{volume:3*%}"
-  #   on_click: |
-  #     case $BUTTON in
-  #       Right) ~/.config/sway/bar-scripts/switch_audio_sink.py next;;
-  #       Left) pavucontrol;;
-  #     esac
-  #   icons: *pulse_icons
+  - name: pulseaudio
+    node: sink
+    format: "{icon}{volume:3*%}"
+    on_click: |
+      case $BUTTON in
+        Right) ~/.config/sway/bar-scripts/switch_audio_sink.py next;;
+        Left) pavucontrol -t 3;;
+      esac
+    icons: *pulse_icons
 
-  # - name: pulseaudio
-  #   node: source
-  #   format: "{icon}{volume:3*%}"
-  #   icons: *pulse_icons
+  - name: pulseaudio
+    node: source
+    format: "{icon}{volume:3*%}"
+    icons: *pulse_icons
+    on_click: |
+      case $BUTTON in
+        Left) pavucontrol -t 4;;
+      esac
 
-  # - name: bluez
-  #   format: " {devices}"
-  #   device_format: "{icon}"
-  #   on_click: |
-  #     [ "$BUTTON" = Left ] && blueman-manager
-  #   icons:
-  #     phone: " "
-  #     audio-card: " "
-  #     audio-headset: " "
-  #     input-keyboard: " "
+  - name: bluez
+    format: " {devices}"
+    device_format: "{icon}"
+    on_click: |
+      case $BUTTON in
+        Left) blueman-manager;;
+      esac
+    icons:
+      phone: " "
+      audio-card: " "
+      audio-headset: " "
+      input-keyboard: " "
 
-  # - name: networkmanager
-  #   format: "{status_icon}{strength:3*%}"
-  #   status_icons:
-  #     unavailable: "直"
-  #     connected: "直"
-  #     disconnected: "睊"
-  #     connecting: " "
-  #     connected_local: "直"
-  #   primary_only: true
+  - name: networkmanager
+    format: "{status_icon}{strength:3*%}"
+    status_icons:
+      unavailable: "直"
+      connected: "直"
+      disconnected: "睊"
+      connecting: " "
+      connected_local: "直"
+    primary_only: true
 
-  # - name: shell
-  #   command: >
-  #     awk -f ~/.config/sway/bar-scripts/cputemp.awk <(sensors)
-  #   interval: 10s
-  #   json: true
+  # # TODO: unimplemented
+  # # - name: cpu
 
-  # - <<: *bat_common
-  #   name: battery
-  #   format: " {percentage:3*%}"
-  #   upower_device: keyboard_hid_dco2co26o0co73o0b_battery
+  - name: shell
+    command: >
+      awk -f ~/.config/sway/bar-scripts/cputemp.awk <(sensors)
+    interval: 10s
+    json: true
 
-  # - <<: *bat_common
-  #   name: battery
-  #   format: "{is_charging$}{state_icon}{percentage:3*%}"
+  - <<: *bat_common
+    name: battery
+    format: " {percentage:3*%}"
+    upower_device: keyboard_hid_dco2co26o0co73o0b_battery
+
+  - <<: *bat_common
+    name: battery
+    format: "{is_charging$}{state_icon}{percentage:3*%}"
 
   - name: sway_layout
     format: "{flag}"
 
-  # - name: time
-
-  # - name: plugin
-  #   path: /home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so
+  - name: time
