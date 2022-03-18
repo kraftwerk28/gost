@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/godbus/dbus/v5"
 	. "github.com/kraftwerk28/gost/core"
@@ -238,14 +239,23 @@ func (t *BatteryBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 }
 
-func (t *BatteryBlock) Render() []I3barBlock {
+func (t *BatteryBlock) Render(cfg *AppConfig) []I3barBlock {
 	if !t.available {
 		return nil
 	}
+	batColor := FromHSV(
+		int((float64(t.percentage)/100)*120),
+		cfg.Theme.Saturation,
+		cfg.Theme.Value,
+	)
 	args := formatting.NamedArgs{
 		"percentage":    t.percentage,
 		"time_to_empty": t.timeToEmpty,
-		"state_icon":    t.getStateIcon(),
+		"state_icon": fmt.Sprintf(
+			`<span color="%s">%s</span>`,
+			batColor.String(),
+			t.getStateIcon(),
+		),
 	}
 	if t.state == upowerStateCharging {
 		args["is_charging"] = t.StateIcons["charging"]
@@ -254,6 +264,7 @@ func (t *BatteryBlock) Render() []I3barBlock {
 	if t.UrgentLevel != nil && t.percentage <= *t.UrgentLevel {
 		b.Urgent = true
 	}
+	b.Markdup = MarkupPango
 	return []I3barBlock{b}
 }
 

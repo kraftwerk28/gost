@@ -100,7 +100,7 @@ func (s *SwayLayout) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	}
 }
 
-func (s *SwayLayout) Render() []I3barBlock {
+func (s *SwayLayout) Render(cfg *AppConfig) []I3barBlock {
 	if s.layouts == nil {
 		return nil
 	}

@@ -153,7 +153,7 @@ func (c *PulseBlock) GetConfig() interface{} {
 	return &c.PulseConfig
 }
 
-func (t *PulseBlock) Render() []I3barBlock {
+func (t *PulseBlock) Render(cfg *AppConfig) []I3barBlock {
 	return []I3barBlock{
 		{
 			FullText: t.Format.Expand(formatting.NamedArgs{

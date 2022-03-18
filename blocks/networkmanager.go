@@ -251,7 +251,7 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 }
 
-func (b *NetworkManagerBlock) Render() []I3barBlock {
+func (b *NetworkManagerBlock) Render(cfg *AppConfig) []I3barBlock {
 	if b.state == nmStateConnectedGlobal && len(b.connections) > 0 {
 		c := b.connections[b.currentConnection]
 		ipMarshalled, _ := c.ipv4.MarshalText()

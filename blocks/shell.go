@@ -113,7 +113,7 @@ func (t *ShellBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
 	}
 }
 
-func (t *ShellBlock) Render() []I3barBlock {
+func (t *ShellBlock) Render(cfg *AppConfig) []I3barBlock {
 	if t.lastText == "" {
 		return nil
 	}

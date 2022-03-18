@@ -154,7 +154,7 @@ func (t *BluezBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 }
 
-func (b *BluezBlock) Render() []I3barBlock {
+func (b *BluezBlock) Render(cfg *AppConfig) []I3barBlock {
 	labels := []string{}
 	for _, d := range b.devices {
 		if d.connected {

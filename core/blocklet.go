@@ -29,7 +29,7 @@ func GetBuiltin(name string) I3barBlockletCtor {
 
 type I3barBlocklet interface {
 	Run(ch UpdateChan, ctx context.Context)
-	Render() []I3barBlock
+	Render(cfg *AppConfig) []I3barBlock
 }
 
 type I3barBlockletConfigurable interface {

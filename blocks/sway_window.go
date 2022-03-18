@@ -33,7 +33,7 @@ func (t *SwayWindow) Run(ch UpdateChan, ctx context.Context) {
 	}
 }
 
-func (t *SwayWindow) Render() []I3barBlock {
+func (t *SwayWindow) Render(cfg *AppConfig) []I3barBlock {
 	return []I3barBlock{{FullText: t.name}}
 }
 

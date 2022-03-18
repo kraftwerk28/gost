@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -18,6 +19,8 @@ import (
 
 const programName = "gost"
 const configFileName = "config.yml"
+
+var jsonEncoder *json.Encoder
 
 func getConfigPath() string {
 	xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
@@ -48,8 +51,15 @@ func readEvents(ch chan *core.I3barClickEvent) {
 }
 
 func feedBlocks(o io.Writer, blocks []core.I3barBlock) error {
-	b, _ := json.Marshal(blocks)
-	b = append(b, ',', '\n')
+	var buf = new(bytes.Buffer)
+	e := json.NewEncoder(buf)
+	e.SetEscapeHTML(false)
+	if err := e.Encode(blocks); err != nil {
+		return err
+	}
+	buf.WriteByte('\n')
+	b := buf.Bytes()
+	b[len(b)-2] = ','
 	_, err := os.Stdout.Write(b)
 	return err
 }
@@ -123,7 +133,10 @@ outerLoop:
 				select {
 				case e := <-eventChan:
 					for _, m := range managers {
-						m.ProcessEvent(e, ctx)
+						if m.MatchesEvent(e) {
+							wg.Add(1)
+							go m.ProcessEvent(e, ctx, wg)
+						}
 					}
 				case <-ctx.Done():
 					break loop

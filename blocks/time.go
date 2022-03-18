@@ -45,7 +45,7 @@ func (t *TimeBlock) Run(ch UpdateChan, ctx context.Context) {
 	}
 }
 
-func (t *TimeBlock) Render() []I3barBlock {
+func (t *TimeBlock) Render(cfg *AppConfig) []I3barBlock {
 	currentTime := time.Now()
 	return []I3barBlock{{
 		FullText: t.Format.Expand(formatting.NamedArgs{

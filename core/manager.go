@@ -43,15 +43,19 @@ func (bm *BlockletMgr) invalidateCache() {
 		}
 		return
 	}
-	blocks := bm.blocklet.Render()
+	blocks := bm.blocklet.Render(bm.appConfig)
 	for i := range blocks {
-		if blocks[i].Name == "" {
-			blocks[i].Name = fmt.Sprintf("%s:%d", bm.name, i)
+		b := &blocks[i]
+		if b.Name == "" {
+			b.Name = fmt.Sprintf("%s:%d", bm.name, i)
 		} else {
-			blocks[i].Name = fmt.Sprintf("%s:%s", bm.name, blocks[i].Name)
+			b.Name = fmt.Sprintf("%s:%s", bm.name, b.Name)
 		}
 		if w := bm.appConfig.SeparatorWidth; w > 0 {
-			blocks[i].SeparatorBlockWidth = w
+			b.SeparatorBlockWidth = w
+		}
+		if bm.appConfig.Markup == MarkupPango {
+			b.Markdup = string(bm.appConfig.Markup)
 		}
 	}
 	bm.renderCache = blocks
@@ -94,7 +98,7 @@ func (bm *BlockletMgr) IsListener() bool {
 	return false
 }
 
-func (bm *BlockletMgr) matchesEvent(e *I3barClickEvent) bool {
+func (bm *BlockletMgr) MatchesEvent(e *I3barClickEvent) bool {
 	return strings.HasPrefix(e.Name, bm.name)
 }
 
@@ -107,13 +111,16 @@ func (bm *BlockletMgr) getBaseConfig() *BaseBlockletConfig {
 	return nil
 }
 
-func (bm *BlockletMgr) ProcessEvent(e *I3barClickEvent, ctx context.Context) bool {
-	if !bm.matchesEvent(e) {
-		return false
-	}
+func (bm *BlockletMgr) ProcessEvent(
+	e *I3barClickEvent,
+	ctx context.Context,
+	wg *sync.WaitGroup,
+) bool {
+	defer wg.Done()
 	if cfg := bm.getBaseConfig(); cfg != nil {
 		if cfg.OnClick != nil {
 			cmd := e.ShellCommand(*cfg.OnClick, ctx)
+			cmd.Start()
 			cerr := cmd.Run()
 			if err, ok := cerr.(*exec.ExitError); ok {
 				Log.Printf("%s\n", err.Stderr)

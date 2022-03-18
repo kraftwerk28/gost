@@ -13,7 +13,9 @@ import (
 type AppConfig struct {
 	Version        string           `yaml:"version"`
 	SeparatorWidth int              `yaml:"separator_width"`
+	Markup         I3barMarkup      `yaml:"markup"`
 	Blocks         []BlockletConfig `yaml:"blocks"`
+	Theme          *ThemeConfig     `yaml:"theme"`
 }
 
 func LoadConfigFromFile(filename string) (*AppConfig, error) {

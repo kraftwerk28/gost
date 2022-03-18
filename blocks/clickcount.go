@@ -34,7 +34,7 @@ func (c *Clickcount) GetConfig() interface{} {
 	return &c.ClickcountConfig
 }
 
-func (t *Clickcount) Render() []I3barBlock {
+func (t *Clickcount) Render(cfg *AppConfig) []I3barBlock {
 	txt := t.Format.Expand(formatting.NamedArgs{
 		"clicks": fmt.Sprintf("%d", t.clicks),
 	})

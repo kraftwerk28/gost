@@ -66,7 +66,7 @@ func (b *DbusBlock) GetConfig() interface{} {
 	return &b.DbusConfig
 }
 
-func (b *DbusBlock) Render() []I3barBlock {
+func (b *DbusBlock) Render(cfg *AppConfig) []I3barBlock {
 	return []I3barBlock{{
 		FullText: b.text,
 	}}
