@@ -5,6 +5,6 @@ type ThemeConfig struct {
 	Value      int `yaml:"value"`
 }
 
-type Theme struct{}
-
-func (t *Theme) Apply(b *I3barBlock) {}
+func (t *ThemeConfig) HSVColor(hue int) *ConfigColor {
+	return FromHSV(hue, t.Saturation, t.Value)
+}

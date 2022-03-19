@@ -243,17 +243,12 @@ func (t *BatteryBlock) Render(cfg *AppConfig) []I3barBlock {
 	if !t.available {
 		return nil
 	}
-	batColor := FromHSV(
-		int((float64(t.percentage)/100)*120),
-		cfg.Theme.Saturation,
-		cfg.Theme.Value,
-	)
 	args := formatting.NamedArgs{
 		"percentage":    t.percentage,
 		"time_to_empty": t.timeToEmpty,
 		"state_icon": fmt.Sprintf(
-			`<span color="%s">%s</span>`,
-			batColor.String(),
+			`<span color="%v">%s</span>`,
+			cfg.Theme.HSVColor(PercentageToHue(t.percentage)),
 			t.getStateIcon(),
 		),
 	}

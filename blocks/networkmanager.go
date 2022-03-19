@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 
 	"github.com/godbus/dbus/v5"
@@ -257,11 +258,16 @@ func (b *NetworkManagerBlock) Render(cfg *AppConfig) []I3barBlock {
 		ipMarshalled, _ := c.ipv4.MarshalText()
 		return []I3barBlock{{
 			FullText: b.Format.Expand(formatting.NamedArgs{
-				"ssid":        c.ssid,
-				"strength":    c.strength,
-				"ipv4":        string(ipMarshalled),
-				"status_icon": b.getStatusIcon(),
+				"ssid":     c.ssid,
+				"strength": c.strength,
+				"ipv4":     string(ipMarshalled),
+				"status_icon": fmt.Sprintf(
+					`<span color="%v">%s</span>`,
+					cfg.Theme.HSVColor(PercentageToHue(c.strength)),
+					b.getStatusIcon(),
+				),
 			}),
+			Markdup: MarkupPango,
 		}}
 	} else {
 		return []I3barBlock{{

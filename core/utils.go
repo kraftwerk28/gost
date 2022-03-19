@@ -16,3 +16,7 @@ func CountryFlagFromIsoCode(countryCode string) string {
 	// Get the flag string from the UTF-8 representation of our Unicode characters.
 	return string([]byte{0xf0, 0x9f, 0x87, b1, 0xf0, 0x9f, 0x87, b2})
 }
+
+func PercentageToHue(p int) int {
+	return int((float64(p) / 100) * 120)
+}

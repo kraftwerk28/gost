@@ -28,7 +28,7 @@ func (t *TimeBlock) Run(ch core.UpdateChan, ctx context.Context) {
 	}
 }
 
-func (t *TimeBlock) Render() []core.I3barBlock {
+func (t *TimeBlock) Render(cfg *core.AppConfig) []core.I3barBlock {
 	currentTime := time.Now()
 	return []core.I3barBlock{{
 		FullText: fmt.Sprintf(

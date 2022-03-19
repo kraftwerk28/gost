@@ -55,7 +55,7 @@ type ConfigColor struct {
 
 var hexColorRe = regexp.MustCompile(`^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})?$`)
 
-func FromHSV(h, s, v int) ConfigColor {
+func FromHSV(h, s, v int) *ConfigColor {
 	var ss, vv, c, x, m, r, g, b float64
 	ss, vv = float64(s)/100, float64(v)/100
 	c = ss * vv
@@ -74,7 +74,7 @@ func FromHSV(h, s, v int) ConfigColor {
 	} else {
 		r, g, b = c, 0, x
 	}
-	return ConfigColor{
+	return &ConfigColor{
 		uint8((r - m) * 255),
 		uint8((g - m) * 255),
 		uint8((b - m) * 255),
