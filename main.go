@@ -50,18 +50,20 @@ func readEvents(ch chan *core.I3barClickEvent) {
 	}
 }
 
-func feedBlocks(o io.Writer, blocks []core.I3barBlock) error {
-	var buf = new(bytes.Buffer)
+func feedBlocks(o io.Writer, blocks []core.I3barBlock) (err error) {
+	buf := new(bytes.Buffer)
 	e := json.NewEncoder(buf)
 	e.SetEscapeHTML(false)
-	if err := e.Encode(blocks); err != nil {
-		return err
+	if err = e.Encode(blocks); err != nil {
+		return
 	}
-	buf.WriteByte('\n')
+	if err = buf.WriteByte('\n'); err != nil {
+		return
+	}
 	b := buf.Bytes()
 	b[len(b)-2] = ','
-	_, err := os.Stdout.Write(b)
-	return err
+	_, err = os.Stdout.Write(b)
+	return
 }
 
 func wgWaitWithSignal(wg *sync.WaitGroup, ch chan os.Signal) {
