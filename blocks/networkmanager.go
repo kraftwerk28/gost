@@ -267,7 +267,7 @@ func (b *NetworkManagerBlock) Render(cfg *AppConfig) []I3barBlock {
 					b.getStatusIcon(),
 				),
 			}),
-			Markdup: MarkupPango,
+			Markup: MarkupPango,
 		}}
 	} else {
 		return []I3barBlock{{
