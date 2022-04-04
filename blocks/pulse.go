@@ -2,12 +2,18 @@ package blocks
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
 	. "github.com/kraftwerk28/gost/core"
 	"github.com/kraftwerk28/gost/core/formatting"
-	"github.com/lawl/pulseaudio"
+	"github.com/kraftwerk28/pulseaudio"
+)
+
+const (
+	nodeKindSink   = "sink"
+	nodeKindSource = "source"
 )
 
 type PulseIconsConfig struct {
@@ -25,9 +31,11 @@ type PulseConfig struct {
 
 type PulseBlock struct {
 	PulseConfig
-	client *pulseaudio.Client
-	Volume uint32
-	Icon   string
+	client   *pulseaudio.Client
+	volume   uint32
+	muted    bool
+	portDesc string
+	// icon   string
 }
 
 func NewPulseBlock() I3barBlocklet {
@@ -44,7 +52,7 @@ const throttleDuration = time.Millisecond * 50
 
 func (c *PulseBlock) fetchInfo() bool {
 	switch c.Node {
-	case "source":
+	case nodeKindSource:
 		source, err := c.getCurrentSource()
 		if source == nil {
 			return false
@@ -52,18 +60,19 @@ func (c *PulseBlock) fetchInfo() bool {
 		if err != nil {
 			Log.Print(err)
 		}
-		c.Volume = volumeToPercentage(source.Cvolume[0])
+		c.volume = volumeToPercentage(source.Cvolume[0])
 		if source.Muted {
-			c.Icon = c.Icons.SourceMuted
+			c.muted = true
 			break
 		}
+		c.muted = false
 		for _, port := range source.Ports {
 			if port.Name == source.ActivePortName {
-				c.Icon = c.Icons.Devices[port.Description]
+				c.portDesc = port.Description
 				break
 			}
 		}
-	case "sink":
+	case nodeKindSink:
 		sink, err := c.getCurrentSink()
 		if sink == nil {
 			return false
@@ -71,14 +80,15 @@ func (c *PulseBlock) fetchInfo() bool {
 		if err != nil {
 			Log.Print(err)
 		}
-		c.Volume = volumeToPercentage(sink.Cvolume[0])
+		c.volume = volumeToPercentage(sink.Cvolume[0])
 		if sink.Muted {
-			c.Icon = c.Icons.SinkMuted
+			c.muted = true
 			break
 		}
+		c.muted = false
 		for _, port := range sink.Ports {
 			if port.Name == sink.ActivePortName {
-				c.Icon = c.Icons.Devices[port.Description]
+				c.portDesc = port.Description
 				break
 			}
 		}
@@ -154,30 +164,53 @@ func (c *PulseBlock) GetConfig() interface{} {
 }
 
 func (t *PulseBlock) Render(cfg *AppConfig) []I3barBlock {
-	return []I3barBlock{
-		{
-			FullText: t.Format.Expand(formatting.NamedArgs{
-				"icon":   t.Icon,
-				"volume": t.Volume,
-			}),
-			Name: "sink",
-		},
+	var icon string
+	if t.muted {
+		switch t.Node {
+		case nodeKindSink:
+			icon = t.Icons.SinkMuted
+		case nodeKindSource:
+			icon = t.Icons.SourceMuted
+		}
+		icon = fmt.Sprintf(
+			`<span color="%v">%s</span>`,
+			cfg.Theme.HSVColor(0),
+			icon,
+		)
+	} else {
+		icon = t.Icons.Devices[t.portDesc]
 	}
+	return []I3barBlock{{
+		FullText: t.Format.Expand(formatting.NamedArgs{
+			"icon":   icon,
+			"volume": t.volume,
+		}),
+		Name:   nodeKindSink,
+		Markup: MarkupPango,
+	}}
 }
 
-func (t *PulseBlock) changeVolume(delta int) {
+func (t *PulseBlock) changeVolume(delta int) error {
 	d := float32(delta) * 0.01
 	switch t.Node {
-	case "sink":
-		s, _ := t.getCurrentSink()
+	case nodeKindSink:
+		s, err := t.getCurrentSink()
+		if err != nil {
+			return err
+		}
 		vol := float32(s.Cvolume[0]) / 0xffff
 		vol += d
-		t.client.SetSinkVolume(s.Name, vol)
-	case "source":
-		// s, _ := t.getCurrentSource()
-		// vol := float32(s.Cvolume[0]) / 0xffff
-		Log.Println("Changing source volume it not supported")
+		return t.client.SetSinkVolume(s.Name, vol)
+	case nodeKindSource:
+		s, err := t.getCurrentSource()
+		if err != nil {
+			return err
+		}
+		vol := float32(s.Cvolume[0]) / 0xffff
+		vol += d
+		return t.client.SetSourceVolume(s.Name, vol)
 	}
+	return nil
 }
 
 func (t *PulseBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {

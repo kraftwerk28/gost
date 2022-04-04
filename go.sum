@@ -1,7 +1,9 @@
+github.com/aarzilli/golua v0.0.0-20210507130708-11106aa57765 h1:N6gB4UCRBZz8twlJbMFiCKj0zX5Et2nFU/LRafT4x80=
+github.com/aarzilli/golua v0.0.0-20210507130708-11106aa57765/go.mod h1:hMjfaJVSqVnxenMlsxrq3Ni+vrm9Hs64tU4M7dhUoO4=
 github.com/godbus/dbus/v5 v5.1.0 h1:4KLkAxT3aOY8Li4FRJe/KvhoNFFxo0m6fNuFUO8QJUk=
 github.com/godbus/dbus/v5 v5.1.0/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
-github.com/lawl/pulseaudio v0.0.0-20210928141934-ed754c0c6618 h1:lktbhQBHluc1oWEDow4DEv13qkWJ8zm/dTUSKer2iKk=
-github.com/lawl/pulseaudio v0.0.0-20210928141934-ed754c0c6618/go.mod h1:9h36x4KH7r2V8DOCKoPMt87IXZ++X90y8D5nnuwq290=
+github.com/kraftwerk28/pulseaudio v0.0.0-20220404101100-fbb8d81f6ba8 h1:5Cm7wsqfPm4X9PJ6KNNeMA4O9uiHeGTIr+9ojxX9Np8=
+github.com/kraftwerk28/pulseaudio v0.0.0-20220404101100-fbb8d81f6ba8/go.mod h1:Lsp10FIS79/PD5+8gUvyFh0lHF1QI8mLoJ9sXF95IsA=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b h1:h8qDotaEPuJATrMmW04NCwg7v22aHH28wwpauUhK9Oo=
