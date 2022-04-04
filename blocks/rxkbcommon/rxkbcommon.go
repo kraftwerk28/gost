@@ -36,6 +36,7 @@ import "C"
 func GetLayoutShortNames() map[string]string {
 	m := map[string]string{}
 	ctx := C.init_ctx()
+	defer C.deinit_ctx(ctx)
 	layout := C.next_layout(ctx, nil)
 	for layout != nil {
 		name := C.get_name(layout)
@@ -43,6 +44,5 @@ func GetLayoutShortNames() map[string]string {
 		m[C.GoString(desc)] = C.GoString(name)
 		layout = C.next_layout(ctx, layout)
 	}
-	C.deinit_ctx(ctx)
 	return m
 }

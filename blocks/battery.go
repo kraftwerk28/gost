@@ -259,7 +259,7 @@ func (t *BatteryBlock) Render(cfg *AppConfig) []I3barBlock {
 	if t.UrgentLevel != nil && t.percentage <= *t.UrgentLevel {
 		b.Urgent = true
 	}
-	b.Markdup = MarkupPango
+	b.Markup = MarkupPango
 	return []I3barBlock{b}
 }
 

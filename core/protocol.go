@@ -167,5 +167,5 @@ type I3barBlock struct {
 
 	// The type of markup to use when parsing the text for the block. This can
 	// either be pango or none (default).
-	Markdup string `json:"markup,omitempty"`
+	Markup string `json:"markup,omitempty"`
 }

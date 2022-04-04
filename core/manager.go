@@ -55,7 +55,7 @@ func (bm *BlockletMgr) invalidateCache() {
 			b.SeparatorBlockWidth = w
 		}
 		if bm.appConfig.Markup == MarkupPango {
-			b.Markdup = string(bm.appConfig.Markup)
+			b.Markup = string(bm.appConfig.Markup)
 		}
 	}
 	bm.renderCache = blocks
