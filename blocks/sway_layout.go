@@ -13,6 +13,7 @@ import (
 
 type SwayLayoutConfig struct {
 	Format *ConfigFormat `yaml:"format"`
+	Input  *string       `yaml:"input"`
 }
 
 type SwayLayout struct {
@@ -24,14 +25,24 @@ type SwayLayout struct {
 }
 
 func NewSwayLayoutBlock() I3barBlocklet {
-	return &SwayLayout{layoutLongToShort: rxkbcommon.GetLayoutShortNames()}
+	return &SwayLayout{}
 }
 
 func (s *SwayLayout) GetConfig() interface{} {
 	return &s.SwayLayoutConfig
 }
 
+func (s *SwayLayout) processDevice(device *ipc.IpcInputDevice) bool {
+	if s.Input != nil && device.Identifier != *s.Input || device.Type != "keyboard" {
+		return false
+	}
+	s.currentLayoutIndex = device.XkbActiveLayoutIndex
+	s.layouts = device.XkbLayoutNames
+	return true
+}
+
 func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
+	s.layoutLongToShort = rxkbcommon.GetLayoutShortNames()
 	ipcClient, _ := ipc.NewIpcClient()
 	defer ipcClient.Close()
 	type IpcChanValue struct {
@@ -48,10 +59,8 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 		Log.Print(err)
 		return
 	}
-	for _, device := range *res.(*[]ipc.IpcInputDevice) {
-		if device.Type == "keyboard" {
-			s.currentLayoutIndex = device.XkbActiveLayoutIndex
-			s.layouts = device.XkbLayoutNames
+	for _, dev := range *res.(*[]ipc.IpcInputDevice) {
+		if s.processDevice(&dev) {
 			break
 		}
 	}
@@ -79,10 +88,7 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 			throttleTimer.Reset(throttleDuration)
 			if e.typ == ipc.IpcEventTypeInput {
 				device := e.payload.(*ipc.InputChange).Input
-				if device.Type == "keyboard" {
-					s.currentLayoutIndex = device.XkbActiveLayoutIndex
-					s.layouts = device.XkbLayoutNames
-				}
+				s.processDevice(&device)
 			}
 		case <-ctx.Done():
 			return
