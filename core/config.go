@@ -102,4 +102,6 @@ type BaseBlockletConfigIface interface {
 	Get() *BaseBlockletConfig
 }
 
-func (c *BaseBlockletConfig) Get() *BaseBlockletConfig { return c }
+func (c *BaseBlockletConfig) Get() *BaseBlockletConfig {
+	return c
+}
