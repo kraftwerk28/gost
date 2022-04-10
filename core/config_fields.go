@@ -18,7 +18,7 @@ type ConfigInterval time.Duration
 func NewFromString(v string) (*ConfigInterval, error) {
 	m := durationRegexp.FindStringSubmatch(v)
 	if m == nil {
-		return nil, errors.New("Invalid value for `interval`")
+		return nil, errors.New("invalid value for `interval`")
 	}
 	var base time.Duration
 	mul, _ := strconv.Atoi(m[1])
@@ -42,7 +42,7 @@ func (c *ConfigInterval) UnmarshalYAML(value *yaml.Node) (err error) {
 		return
 	}
 	result := new(ConfigInterval)
-	if result, err = NewFromString(v); err != nil {
+	if c, err = NewFromString(v); err != nil {
 		return
 	}
 	*c = *result
@@ -82,6 +82,14 @@ func FromHSV(h, s, v int) *ConfigColor {
 	}
 }
 
+func FromRGB(r, g, b uint8) *ConfigColor {
+	return &ConfigColor{r, g, b, 0xff}
+}
+
+func FromRGBA(r, g, b, a uint8) *ConfigColor {
+	return &ConfigColor{r, g, b, a}
+}
+
 func (c *ConfigColor) UnmarshalYAML(node *yaml.Node) (err error) {
 	var v string
 	if err = node.Decode(&v); err != nil {
@@ -89,7 +97,7 @@ func (c *ConfigColor) UnmarshalYAML(node *yaml.Node) (err error) {
 	}
 	m := hexColorRe.FindStringSubmatch(v)
 	if m == nil {
-		return errors.New("Invalid hex color")
+		return errors.New("invalid hex color")
 	}
 	r, _ := strconv.ParseUint(m[1], 16, 8)
 	g, _ := strconv.ParseUint(m[2], 16, 8)

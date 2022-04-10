@@ -34,10 +34,10 @@ func (t *TimeBlock) GetConfig() interface{} {
 }
 
 func (t *TimeBlock) Run(ch UpdateChan, ctx context.Context) {
-	ti := time.Tick(time.Duration(*t.Interval))
+	tickTimer := time.NewTicker(time.Duration(*t.Interval))
 	for {
 		select {
-		case <-ti:
+		case <-tickTimer.C:
 			ch.SendUpdate()
 		case <-ctx.Done():
 			return

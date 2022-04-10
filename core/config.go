@@ -16,6 +16,7 @@ type AppConfig struct {
 	Markup         I3barMarkup      `yaml:"markup"`
 	Blocks         []BlockletConfig `yaml:"blocks"`
 	Theme          *ThemeConfig     `yaml:"theme"`
+	Watch          *bool            `yaml:"watch"`
 }
 
 func LoadConfigFromFile(filename string) (*AppConfig, error) {

@@ -60,7 +60,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 			}
 		}
 	} else if t.Interval != nil {
-		ticker := time.Tick(time.Duration(*t.Interval))
+		tickTimer := time.NewTicker(time.Duration(*t.Interval))
 	loop:
 		for {
 			cmd := t.newCmd(ctx)
@@ -75,7 +75,7 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 				ch.SendUpdate()
 			}
 			select {
-			case <-ticker:
+			case <-tickTimer.C:
 				continue loop
 			case <-ctx.Done():
 				break loop
@@ -84,11 +84,11 @@ func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
 	} else {
 		cmd := t.newCmd(ctx)
 		rc, err := cmd.StdoutPipe()
-		defer rc.Close()
 		if err != nil {
 			// TODO: per-block logger
 			Log.Print(err)
 		}
+		defer rc.Close()
 		sc := bufio.NewScanner(rc)
 		if err := cmd.Start(); err != nil {
 			Log.Print(err)

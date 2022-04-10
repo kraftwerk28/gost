@@ -13,14 +13,13 @@ import (
 	"sync"
 	"syscall"
 
-	_ "github.com/kraftwerk28/gost/blocks"
+	"github.com/fsnotify/fsnotify"
+	"github.com/kraftwerk28/gost/blocks"
 	"github.com/kraftwerk28/gost/core"
 )
 
 const programName = "gost"
 const configFileName = "config.yml"
-
-var jsonEncoder *json.Encoder
 
 func getConfigPath() string {
 	xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
@@ -66,8 +65,12 @@ func feedBlocks(o io.Writer, blocks []core.I3barBlock) (err error) {
 	return
 }
 
-func wgWaitWithSignal(wg *sync.WaitGroup, ch chan os.Signal) {
-	wg.Wait()
+func setupWatcher(path string) (w *fsnotify.Watcher, err error) {
+	if w, err = fsnotify.NewWatcher(); err != nil {
+		return
+	}
+	w.Add(path)
+	return
 }
 
 func main() {
@@ -77,10 +80,9 @@ func main() {
 	flag.StringVar(&logPath, "log", "", "Path to log file")
 	flag.Parse()
 
-	signalChan := make(chan os.Signal)
+	signalChan := make(chan os.Signal, 1)
 	signal.Notify(
 		signalChan,
-		syscall.SIGCONT, syscall.SIGSTOP, // defined by protocol
 		syscall.SIGUSR2,                 // reload config
 		syscall.SIGTERM, syscall.SIGINT, // exit
 	)
@@ -111,6 +113,7 @@ func main() {
 
 	eventChan := make(chan *core.I3barClickEvent)
 	go readEvents(eventChan)
+	// var fileWatchCh chan fsnotify.Event
 
 outerLoop:
 	for {
@@ -120,10 +123,20 @@ outerLoop:
 			cfgPath = getConfigPath()
 		}
 		var cfg *core.AppConfig
+		var managers []*core.BlockletMgr
 		if cfg, err = core.LoadConfigFromFile(cfgPath); err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			b := blocks.NewStaticBlock("Error loading the config: " + err.Error())
+			managers = []*core.BlockletMgr{core.NewBlockletMgr("error", b, nil)}
+			// if cfg.Watch == nil || *cfg.Watch == true {
+			// 	w, err := setupWatcher(cfgPath)
+			// 	if err == nil {
+			// 		fileWatchCh = w.Events
+			// 	}
+			// }
+		} else {
+			managers = cfg.CreateManagers(ctx)
 		}
-		managers := cfg.CreateManagers(ctx)
 		wg.Add(len(managers))
 		updateChan := make(chan string)
 		for _, m := range managers {
@@ -166,10 +179,6 @@ outerLoop:
 					log.Println("Waiting for blocklets to finish...")
 					wg.Wait()
 					break renderLoop
-				case syscall.SIGSTOP:
-					// Stop emitting JSON
-				case syscall.SIGCONT:
-					// Continue emitting JSON
 				case syscall.SIGTERM, syscall.SIGINT:
 					ctxCancel()
 					log.Println("Waiting for blocklets to finish...")
@@ -192,6 +201,13 @@ outerLoop:
 						}
 					}
 				}
+				// case e := <-fileWatchCh:
+				// 	if e.Op == fsnotify.Create {
+				// 		ctxCancel()
+				// 		log.Println("Waiting for blocklets to finish...")
+				// 		wg.Wait()
+				// 		break renderLoop
+				// 	}
 			}
 		}
 	}

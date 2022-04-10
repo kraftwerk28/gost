@@ -14,7 +14,7 @@ type I3barMarkup string
 
 const (
 	MarkupNone  I3barMarkup = "none"
-	MarkupPango             = "pango"
+	MarkupPango I3barMarkup = "pango"
 )
 
 type eventButton int
@@ -38,10 +38,10 @@ func (b eventButton) String() string {
 
 const (
 	ButtonLeft       eventButton = 1
-	ButtonMiddle                 = 2
-	ButtonRight                  = 3
-	ButtonScrollUp               = 4
-	ButtonScrollDown             = 5
+	ButtonMiddle     eventButton = 2
+	ButtonRight      eventButton = 3
+	ButtonScrollUp   eventButton = 4
+	ButtonScrollDown eventButton = 5
 )
 
 type I3barHeader struct {
@@ -102,8 +102,8 @@ type blockAlign string
 
 const (
 	BlockAlignLeft   blockAlign = "left"
-	BlockAlignRight             = "right"
-	BlockAlignCenter            = "center"
+	BlockAlignRight  blockAlign = "right"
+	BlockAlignCenter blockAlign = "center"
 )
 
 type I3barBlock struct {
@@ -167,5 +167,5 @@ type I3barBlock struct {
 
 	// The type of markup to use when parsing the text for the block. This can
 	// either be pango or none (default).
-	Markup string `json:"markup,omitempty"`
+	Markup I3barMarkup `json:"markup,omitempty"`
 }

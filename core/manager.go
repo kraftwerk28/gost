@@ -51,11 +51,13 @@ func (bm *BlockletMgr) invalidateCache() {
 		} else {
 			b.Name = fmt.Sprintf("%s:%s", bm.name, b.Name)
 		}
-		if w := bm.appConfig.SeparatorWidth; w > 0 {
-			b.SeparatorBlockWidth = w
-		}
-		if bm.appConfig.Markup == MarkupPango {
-			b.Markup = string(bm.appConfig.Markup)
+		if bm.appConfig != nil {
+			if w := bm.appConfig.SeparatorWidth; w > 0 {
+				b.SeparatorBlockWidth = w
+			}
+			if bm.appConfig.Markup == MarkupPango {
+				b.Markup = bm.appConfig.Markup
+			}
 		}
 	}
 	bm.renderCache = blocks

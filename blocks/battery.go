@@ -14,17 +14,17 @@ const upowerDbusBasePath dbus.ObjectPath = "/org/freedesktop/UPower"
 
 const (
 	upowerStateUnknown          uint32 = 0
-	upowerStateCharging                = 1
-	upowerStateDischarging             = 2
-	upowerStateEmpty                   = 3
-	upowerStateFullyCharged            = 4
-	upowerStatePendingCharge           = 5
-	upowerStatePendingDischarge        = 6
+	upowerStateCharging         uint32 = 1
+	upowerStateDischarging      uint32 = 2
+	upowerStateEmpty            uint32 = 3
+	upowerStateFullyCharged     uint32 = 4
+	upowerStatePendingCharge    uint32 = 5
+	upowerStatePendingDischarge uint32 = 6
 )
 
 const (
 	deviceTypeBattery  uint32 = 2
-	deviceTypeKeyboard        = 6
+	deviceTypeKeyboard uint32 = 6
 )
 
 type BatteryBlockConfig struct {

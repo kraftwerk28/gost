@@ -70,17 +70,15 @@ func (d *NmDevice) loadProps(conn *dbus.Conn) (err error) {
 	if err = dbusGetProp(o, nmDbusDest+".Device", "DeviceType", &d.deviceType); err != nil {
 		return
 	}
-	if err = dbusGetProp(
+	dbusGetProp(o, nmDbusDest+".Device.Wireless", "Bitrate", &d.bitrate)
+	dbusGetProp(
 		o, nmDbusDest+".Device.Wireless",
 		"ActiveAccessPoint", &d.accessPoint.objectPath,
-	); err != nil {
-		return
-	}
-	if err = d.accessPoint.loadProps(conn); err != nil {
-		return
-	}
-	if err = dbusGetProp(o, nmDbusDest+".Device.Wireless", "Bitrate", &d.bitrate); err != nil {
-		return
+	)
+	if d.accessPoint.objectPath != "" {
+		if err = d.accessPoint.loadProps(conn); err != nil {
+			return
+		}
 	}
 	return
 }
