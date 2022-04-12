@@ -1,6 +1,8 @@
 package core
 
-import "strings"
+import (
+	"strings"
+)
 
 func CountryFlagFromIsoCode(countryCode string) string {
 	if len(countryCode) != 2 {
@@ -20,3 +22,31 @@ func CountryFlagFromIsoCode(countryCode string) string {
 func PercentageToHue(p int) int {
 	return int((float64(p) / 100) * 120)
 }
+
+// func DebounceChan[T any](duration time.Duration, cIn chan T) (cOut chan T) {
+// 	t := time.NewTimer(duration)
+// 	cOut = make(chan T)
+// 	var lastValue *T
+// 	inClosed := false
+// 	go func() {
+// 		defer close(cOut)
+// 		for {
+// 			select {
+// 			case v, ok := <-cIn:
+// 				lastValue = &v
+// 				t.Reset(duration)
+// 				if !ok {
+// 					inClosed = true
+// 				}
+// 			case <-t.C:
+// 				if lastValue != nil {
+// 					cOut <- *lastValue
+// 				}
+// 				if inClosed {
+// 					return
+// 				}
+// 			}
+// 		}
+// 	}()
+// 	return
+// }

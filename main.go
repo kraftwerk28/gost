@@ -19,15 +19,27 @@ import (
 )
 
 const programName = "gost"
-const configFileName = "config.yml"
 
-func getConfigPath() string {
+func getConfigPath(flag string) string {
+	if len(flag) > 0 {
+		return flag
+	}
 	xdg, hasXdg := os.LookupEnv("XDG_CONFIG_HOME")
 	if !hasXdg {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
 		xdg = path.Join(home, ".config")
 	}
-	return path.Join(xdg, programName, configFileName)
+	p := path.Join(xdg, programName, "config.yml")
+	if _, err := os.Stat(p); err != nil {
+		p = path.Join(xdg, programName, "config.yaml")
+	}
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
 }
 
 func readEvents(ch chan *core.I3barClickEvent) {
@@ -73,10 +85,32 @@ func setupWatcher(path string) (w *fsnotify.Watcher, err error) {
 	return
 }
 
+func processEvents(
+	ctx context.Context,
+	managers []core.BlockletMgr,
+	wg *sync.WaitGroup,
+	events chan *core.I3barClickEvent,
+) {
+	for {
+		select {
+		case e := <-events:
+			for i := range managers {
+				m := &managers[i]
+				if m.MatchesEvent(e) {
+					wg.Add(1)
+					go m.ProcessEvent(e, ctx, wg)
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func main() {
-	var cfgPath, logPath string
+	var cfgPathFlag, logPath string
 	var err error
-	flag.StringVar(&cfgPath, "config", "", "Path to config.yml")
+	flag.StringVar(&cfgPathFlag, "config", "", "Path to config.yml")
 	flag.StringVar(&logPath, "log", "", "Path to log file")
 	flag.Parse()
 
@@ -113,56 +147,44 @@ func main() {
 
 	eventChan := make(chan *core.I3barClickEvent)
 	go readEvents(eventChan)
-	// var fileWatchCh chan fsnotify.Event
 
 outerLoop:
 	for {
 		ctx, ctxCancel := context.WithCancel(context.Background())
 		wg := &sync.WaitGroup{}
+		cfgPath := getConfigPath(cfgPathFlag)
 		if cfgPath == "" {
-			cfgPath = getConfigPath()
+			log.Fatalln("No config file found")
 		}
 		var cfg *core.AppConfig
-		var managers []*core.BlockletMgr
-		if cfg, err = core.LoadConfigFromFile(cfgPath); err != nil {
+		var configWatcher *fsnotify.Watcher
+		var fileWatchChan chan fsnotify.Event
+		var managers []core.BlockletMgr
+		if cfg, err = core.LoadConfigFromFile(cfgPathFlag); err != nil {
 			log.Println(err)
 			b := blocks.NewStaticBlock("Error loading the config: " + err.Error())
-			managers = []*core.BlockletMgr{core.NewBlockletMgr("error", b, nil)}
-			// if cfg.Watch == nil || *cfg.Watch == true {
-			// 	w, err := setupWatcher(cfgPath)
-			// 	if err == nil {
-			// 		fileWatchCh = w.Events
-			// 	}
-			// }
+			managers = []core.BlockletMgr{core.MakeBlockletMgr("error", b, nil)}
 		} else {
 			managers = cfg.CreateManagers(ctx)
 		}
+		if cfg.WatchConfig == nil || *cfg.WatchConfig == true {
+			log.Println("Watching config for changes")
+			configWatcher, err = setupWatcher(cfgPathFlag)
+			if err == nil {
+				fileWatchChan = configWatcher.Events
+			}
+		}
 		wg.Add(len(managers))
 		updateChan := make(chan string)
-		for _, m := range managers {
-			go m.Run(updateChan, ctx, wg)
+		for i := range managers {
+			go managers[i].Run(updateChan, ctx, wg)
 		}
-		go func() {
-		loop:
-			for {
-				select {
-				case e := <-eventChan:
-					for _, m := range managers {
-						if m.MatchesEvent(e) {
-							wg.Add(1)
-							go m.ProcessEvent(e, ctx, wg)
-						}
-					}
-				case <-ctx.Done():
-					break loop
-				}
-			}
-		}()
+		go processEvents(ctx, managers, wg, eventChan)
 	renderLoop:
 		for {
 			blocks := make([]core.I3barBlock, 0, len(managers))
-			for _, m := range managers {
-				blocks = append(blocks, m.Render()...)
+			for i := range managers {
+				blocks = append(blocks, managers[i].Render()...)
 			}
 			if err := feedBlocks(os.Stdout, blocks); err != nil {
 				log.Print(err)
@@ -176,12 +198,12 @@ outerLoop:
 				switch signal {
 				case syscall.SIGUSR2:
 					ctxCancel()
-					log.Println("Waiting for blocklets to finish...")
+					log.Println("Waiting for blocklets to finish")
 					wg.Wait()
 					break renderLoop
 				case syscall.SIGTERM, syscall.SIGINT:
 					ctxCancel()
-					log.Println("Waiting for blocklets to finish...")
+					log.Println("Waiting for blocklets to finish")
 					c := make(chan struct{})
 					go func() {
 						wg.Wait()
@@ -194,22 +216,24 @@ outerLoop:
 						case s := <-signalChan:
 							if s == syscall.SIGINT || s == syscall.SIGTERM {
 								log.Println(
-									"Blocks didn't finish. Exiting anyway...",
+									"Blocks didn't finish. Exiting anyway.",
 								)
 								break outerLoop
 							}
 						}
 					}
 				}
-				// case e := <-fileWatchCh:
-				// 	if e.Op == fsnotify.Create {
-				// 		ctxCancel()
-				// 		log.Println("Waiting for blocklets to finish...")
-				// 		wg.Wait()
-				// 		break renderLoop
-				// 	}
+			case e := <-fileWatchChan:
+				if e.Op == fsnotify.Write {
+					log.Println("Config change detected. Reloading")
+					configWatcher.Close()
+					ctxCancel()
+					log.Println("Waiting for blocklets to finish")
+					wg.Wait()
+					break renderLoop
+				}
 			}
 		}
 	}
-	log.Println("Auf Wiedersehen.")
+	log.Println("Auf Wiedersehen")
 }

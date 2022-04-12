@@ -16,8 +16,8 @@ func (u *UpdateChan) SendUpdate() {
 
 type I3barBlockletCtor func() I3barBlocklet
 
-var builtin = map[string]I3barBlockletCtor{}
-var blockletCounters = map[string]int{}
+var builtin = make(map[string]I3barBlockletCtor)
+var blockletCounters = make(map[string]int)
 
 func RegisterBlocklet(name string, ctor I3barBlockletCtor) {
 	builtin[name] = ctor

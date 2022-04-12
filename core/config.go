@@ -16,7 +16,7 @@ type AppConfig struct {
 	Markup         I3barMarkup      `yaml:"markup"`
 	Blocks         []BlockletConfig `yaml:"blocks"`
 	Theme          *ThemeConfig     `yaml:"theme"`
-	Watch          *bool            `yaml:"watch"`
+	WatchConfig    *bool            `yaml:"watch_config"`
 }
 
 func LoadConfigFromFile(filename string) (*AppConfig, error) {
@@ -33,8 +33,8 @@ func LoadConfigFromFile(filename string) (*AppConfig, error) {
 	return cfg, nil
 }
 
-func (cfg *AppConfig) CreateManagers(ctx context.Context) []*BlockletMgr {
-	managers := make([]*BlockletMgr, 0, len(cfg.Blocks))
+func (cfg *AppConfig) CreateManagers(ctx context.Context) []BlockletMgr {
+	managers := make([]BlockletMgr, 0, len(cfg.Blocks))
 	for _, c := range cfg.Blocks {
 		var ctor I3barBlockletCtor
 		if c.Name == "plugin" {
@@ -72,7 +72,7 @@ func (cfg *AppConfig) CreateManagers(ctx context.Context) []*BlockletMgr {
 				log.Fatal(err)
 			}
 		}
-		m := NewBlockletMgr(c.Name, blocklet, cfg)
+		m := MakeBlockletMgr(c.Name, blocklet, cfg)
 		managers = append(managers, m)
 	}
 	return managers

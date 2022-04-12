@@ -1,6 +1,6 @@
 module github.com/kraftwerk28/gost
 
-go 1.17
+go 1.18
 
 require (
 	github.com/aarzilli/golua v0.0.0-20210507130708-11106aa57765

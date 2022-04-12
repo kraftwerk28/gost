@@ -19,14 +19,14 @@ type BlockletMgr struct {
 	isError     bool
 }
 
-func NewBlockletMgr(
+func MakeBlockletMgr(
 	name string,
 	b I3barBlocklet,
 	cfg *AppConfig,
-) *BlockletMgr {
+) BlockletMgr {
 	bmName := fmt.Sprintf("%s:%d", name, blockletCounters[name])
 	blockletCounters[name]++
-	return &BlockletMgr{name: bmName, blocklet: b, appConfig: cfg}
+	return BlockletMgr{name: bmName, blocklet: b, appConfig: cfg}
 }
 
 func (bm *BlockletMgr) invalidateCache() {
