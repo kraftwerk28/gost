@@ -42,7 +42,7 @@ func (c *ConfigInterval) UnmarshalYAML(value *yaml.Node) (err error) {
 		return
 	}
 	result := new(ConfigInterval)
-	if c, err = NewFromString(v); err != nil {
+	if result, err = NewFromString(v); err != nil {
 		return
 	}
 	*c = *result
