@@ -160,16 +160,16 @@ outerLoop:
 		var configWatcher *fsnotify.Watcher
 		var fileWatchChan chan fsnotify.Event
 		var managers []core.BlockletMgr
-		if cfg, err = core.LoadConfigFromFile(cfgPathFlag); err != nil {
+		if cfg, err = core.LoadConfigFromFile(cfgPath); err != nil {
 			log.Println(err)
 			b := blocks.NewStaticBlock("Error loading the config: " + err.Error())
 			managers = []core.BlockletMgr{core.MakeBlockletMgr("error", b, nil)}
 		} else {
 			managers = cfg.CreateManagers(ctx)
 		}
-		if cfg.WatchConfig == nil || *cfg.WatchConfig == true {
+		if cfg.WatchConfig == nil || *cfg.WatchConfig {
 			log.Println("Watching config for changes")
-			configWatcher, err = setupWatcher(cfgPathFlag)
+			configWatcher, err = setupWatcher(cfgPath)
 			if err == nil {
 				fileWatchChan = configWatcher.Events
 			}
@@ -204,20 +204,18 @@ outerLoop:
 				case syscall.SIGTERM, syscall.SIGINT:
 					ctxCancel()
 					log.Println("Waiting for blocklets to finish")
-					c := make(chan struct{})
+					c := make(chan int)
 					go func() {
 						wg.Wait()
-						c <- struct{}{}
+						c <- 0
 					}()
 					for {
 						select {
 						case <-c:
 							break outerLoop
 						case s := <-signalChan:
-							if s == syscall.SIGINT || s == syscall.SIGTERM {
-								log.Println(
-									"Blocks didn't finish. Exiting anyway.",
-								)
+							if s == signal {
+								log.Println("Graceful stop failed")
 								break outerLoop
 							}
 						}
