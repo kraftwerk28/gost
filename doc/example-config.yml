@@ -66,8 +66,9 @@ blocks:
       input-keyboard: " "
 
   - name: networkmanager
-    format: "{status_icon}{ipv4$}{access_point}"
+    format: "{status_icon}{vpn}{ipv4$}{access_point}"
     icons:
+      vpn: "嬨"
       unavailable: " "
       wifi:
         connected: "直"

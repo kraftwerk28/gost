@@ -27,14 +27,16 @@ type NmActiveConnection struct {
 	objectPath dbus.ObjectPath
 	device     NmDevice
 	ip4Config  NmIp4Config
+	isVpn      bool
 }
 
 func (c *NmActiveConnection) isWireless() bool {
-	if c.device.deviceType == NM_DEVICE_TYPE_WIFI ||
-		c.device.deviceType == NM_DEVICE_TYPE_WIFI_P2P {
+	switch c.device.deviceType {
+	case NM_DEVICE_TYPE_WIFI, NM_DEVICE_TYPE_WIFI_P2P:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 func (c *NmActiveConnection) loadProps(conn *dbus.Conn) (err error) {
@@ -44,7 +46,9 @@ func (c *NmActiveConnection) loadProps(conn *dbus.Conn) (err error) {
 	if err = dbusGetProp(o, iface, "Devices", &devices); err != nil {
 		return
 	}
-	// TODO: check for empty array
+	if len(devices) == 0 {
+		return
+	}
 	c.device.objectPath = devices[0]
 	if err = c.device.loadProps(conn); err != nil {
 		return
@@ -53,6 +57,9 @@ func (c *NmActiveConnection) loadProps(conn *dbus.Conn) (err error) {
 		return
 	}
 	if err = c.ip4Config.loadProps(conn); err != nil {
+		return
+	}
+	if err = dbusGetProp(o, iface, "Vpn", &c.isVpn); err != nil {
 		return
 	}
 	return
@@ -330,13 +337,19 @@ func (b *NetworkManagerBlock) Render(cfg *AppConfig) []I3barBlock {
 			)
 		}
 	}
+	args := formatting.NamedArgs{
+		"status_icon":  icon,
+		"ipv4":         c.ip4Config.ipString(),
+		"access_point": accessPoint,
+	}
+	if c.isVpn {
+		if vpnIcon, ok := b.Icons["vpn"].(string); ok {
+			args["vpn"] = vpnIcon
+		}
+	}
 	return []I3barBlock{{
-		FullText: b.Format.Expand(formatting.NamedArgs{
-			"status_icon":  icon,
-			"ipv4":         c.ip4Config.ipString(),
-			"access_point": accessPoint,
-		}),
-		Markup: MarkupPango,
+		FullText: b.Format.Expand(args),
+		Markup:   MarkupPango,
 	}}
 }
 
