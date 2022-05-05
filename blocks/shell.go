@@ -21,13 +21,13 @@ type ShellBlockConfig struct {
 }
 
 type ShellBlock struct {
-	*ShellBlockConfig
+	ShellBlockConfig
 	lastText string
 	log      *log.Logger
 }
 
 func NewShellBlock() I3barBlocklet {
-	return &ShellBlock{ShellBlockConfig: new(ShellBlockConfig)}
+	return &ShellBlock{}
 }
 
 func (s *ShellBlock) GetConfig() interface{} {

@@ -232,9 +232,21 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 			for i := range t.connections {
 				conn := &t.connections[i]
 				switch sig.Path {
-				case conn.objectPath, nmDbusBasePath:
-					// Reload it completely
-					t.loadConnections()
+				case nmDbusBasePath:
+					if _, ok := changedProps["PrimaryConnection"]; ok {
+						if t.PrimaryOnly {
+							t.loadConnections()
+							ch.SendUpdate()
+						}
+					}
+					if _, ok := changedProps["ActiveConnections"]; ok {
+						if !t.PrimaryOnly {
+							t.loadConnections()
+							ch.SendUpdate()
+						}
+					}
+				case conn.objectPath:
+					conn.loadProps(t.dbus)
 					ch.SendUpdate()
 				case conn.device.objectPath:
 					if st, ok := changedProps["Bitrate"]; ok {
