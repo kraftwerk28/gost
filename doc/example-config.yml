@@ -25,6 +25,8 @@ separator_width: 16
 
 blocks:
 
+  - name: mpris
+
   - name: plugin
     path: /home/kraftwerk28/projects/go/src/github.com/kraftwerk28/gost/contrib/build/time.so
 

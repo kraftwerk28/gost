@@ -13,7 +13,6 @@ import (
 
 const nmDbusDest = "org.freedesktop.NetworkManager"
 const nmDbusBasePath dbus.ObjectPath = "/org/freedesktop/NetworkManager"
-const dbusGetProperty = "org.freedesktop.DBus.Properties.Get"
 
 type NetworkManagerBlockConfig struct {
 	BaseBlockletConfig `yaml:",inline"`
@@ -203,8 +202,8 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 	defer conn.Close()
 	t.dbus = conn
 	if err = conn.AddMatchSignal(
-		dbus.WithMatchPathNamespace("/org/freedesktop/NetworkManager"),
-		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchPathNamespace(nmDbusBasePath),
+		dbus.WithMatchInterface(dbusPropertiesIface),
 		dbus.WithMatchMember("PropertiesChanged"),
 	); err != nil {
 		Log.Print(err)
@@ -233,6 +232,10 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 				conn := &t.connections[i]
 				switch sig.Path {
 				case nmDbusBasePath:
+					if _, ok := changedProps["State"]; ok {
+						t.loadConnections()
+						ch.SendUpdate()
+					}
 					if _, ok := changedProps["PrimaryConnection"]; ok {
 						if t.PrimaryOnly {
 							t.loadConnections()

@@ -167,7 +167,7 @@ outerLoop:
 		} else {
 			managers = cfg.CreateManagers(ctx)
 		}
-		if cfg.WatchConfig == nil || *cfg.WatchConfig {
+		if cfg != nil && (cfg.WatchConfig == nil || *cfg.WatchConfig) {
 			log.Println("Watching config for changes")
 			configWatcher, err = setupWatcher(cfgPath)
 			if err == nil {

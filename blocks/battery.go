@@ -120,7 +120,7 @@ func (t *BatteryBlock) findLaptopBattery(ctx context.Context) (p dbus.ObjectPath
 		e = t.dbusConn.Object(
 			upowerDbusDest, oPath,
 		).CallWithContext(
-			ctx, "org.freedesktop.DBus.Properties.Get", 0,
+			ctx, dbusGetProperty, 0,
 			upowerDbusDest+".Device", "Type",
 		).Store(&devType)
 		if e != nil {
@@ -138,10 +138,7 @@ func (t *BatteryBlock) loadInitial() (err error) {
 	obj := t.dbusConn.Object(upowerDbusDest, dbus.ObjectPath(t.UpowerDevice))
 	iface := upowerDbusDest + ".Device"
 	for k, v := range t.propMap {
-		if err = obj.Call(
-			"org.freedesktop.DBus.Properties.Get", 0,
-			iface, k,
-		).Store(v); err != nil {
+		if err = obj.Call(dbusGetProperty, 0, iface, k).Store(v); err != nil {
 			return
 		}
 	}

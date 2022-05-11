@@ -12,7 +12,10 @@ type DbusConfig struct {
 	InitialText string `yaml:"initial_text"`
 }
 
+const dbusGetProperty = "org.freedesktop.DBus.Properties.Get"
+const dbusPropertiesIface = "org.freedesktop.DBus.Properties"
 const dbusCustomInterface = "com.kraftwerk28.gost"
+const dbusObjectPath dbus.ObjectPath = "/org/freedesktop/DBus"
 
 type DbusBlock struct {
 	DbusConfig
