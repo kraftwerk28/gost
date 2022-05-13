@@ -12,6 +12,7 @@ import (
 	"path"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/kraftwerk28/gost/blocks"
@@ -107,6 +108,23 @@ func processEvents(
 	}
 }
 
+func stopWithTimeout(cancel context.CancelFunc, wg *sync.WaitGroup) bool {
+	wgDoneCh := make(chan struct{})
+	go func() {
+		wg.Wait()
+		wgDoneCh <- struct{}{}
+	}()
+	cancel()
+	tout := time.NewTimer(time.Second * 3)
+	select {
+	case <-wgDoneCh:
+		tout.Stop()
+		return true
+	case <-tout.C:
+		return false
+	}
+}
+
 func main() {
 	var cfgPathFlag, logPath string
 	var err error
@@ -151,7 +169,7 @@ func main() {
 outerLoop:
 	for {
 		ctx, ctxCancel := context.WithCancel(context.Background())
-		wg := &sync.WaitGroup{}
+		wg := sync.WaitGroup{}
 		cfgPath := getConfigPath(cfgPathFlag)
 		if cfgPath == "" {
 			log.Fatalln("No config file found")
@@ -166,20 +184,22 @@ outerLoop:
 			managers = []core.BlockletMgr{core.MakeBlockletMgr("error", b, nil)}
 		} else {
 			managers = cfg.CreateManagers(ctx)
-		}
-		if cfg != nil && (cfg.WatchConfig == nil || *cfg.WatchConfig) {
-			log.Println("Watching config for changes")
-			configWatcher, err = setupWatcher(cfgPath)
-			if err == nil {
-				fileWatchChan = configWatcher.Events
+			if cfg.WatchConfig == nil || *cfg.WatchConfig {
+				configWatcher, err = setupWatcher(cfgPath)
+				if err == nil {
+					fileWatchChan = configWatcher.Events
+					log.Println("Watching config for changes")
+				} else {
+					log.Print(err)
+				}
 			}
 		}
 		wg.Add(len(managers))
 		updateChan := make(chan string)
 		for i := range managers {
-			go managers[i].Run(updateChan, ctx, wg)
+			go managers[i].Run(updateChan, ctx, &wg)
 		}
-		go processEvents(ctx, managers, wg, eventChan)
+		go processEvents(ctx, managers, &wg, eventChan)
 	renderLoop:
 		for {
 			blocks := make([]core.I3barBlock, 0, len(managers))
@@ -197,38 +217,29 @@ outerLoop:
 			case signal := <-signalChan:
 				switch signal {
 				case syscall.SIGUSR2:
-					ctxCancel()
-					log.Println("Waiting for blocklets to finish")
-					wg.Wait()
+					log.Println("Waiting for blocklets to stop")
+					if !stopWithTimeout(ctxCancel, &wg) {
+						log.Println("Blocklets failed to stop")
+					}
 					break renderLoop
 				case syscall.SIGTERM, syscall.SIGINT:
-					ctxCancel()
 					log.Println("Waiting for blocklets to finish")
-					c := make(chan int)
-					go func() {
-						wg.Wait()
-						c <- 0
-					}()
-					for {
-						select {
-						case <-c:
-							break outerLoop
-						case s := <-signalChan:
-							if s == signal {
-								log.Println("Graceful stop failed")
-								break outerLoop
-							}
-						}
+					if !stopWithTimeout(ctxCancel, &wg) {
+						log.Println("Blocklets failed to stop")
 					}
+					break outerLoop
 				}
 			case e := <-fileWatchChan:
 				if e.Op == fsnotify.Write {
-					log.Println("Config change detected. Reloading")
-					configWatcher.Close()
-					ctxCancel()
+					log.Println("Config change detected")
 					log.Println("Waiting for blocklets to finish")
-					wg.Wait()
-					break renderLoop
+					if !stopWithTimeout(ctxCancel, &wg) {
+						log.Println("Blocklets failed to stop")
+						break outerLoop
+					} else {
+						configWatcher.Close()
+						break renderLoop
+					}
 				}
 			}
 		}
