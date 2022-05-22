@@ -2,14 +2,17 @@ package blocks
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
 	. "github.com/kraftwerk28/gost/core"
+	"github.com/kraftwerk28/gost/core/formatting"
 )
 
 type MprisBlockConfig struct {
+	Icons        map[playbackStatus]string `yaml:"icons"`
+	PlayerFormat *ConfigFormat             `yaml:"player_format"`
+	Separator    string                    `yaml:"separator"`
 }
 
 type playbackStatus string
@@ -34,14 +37,14 @@ type MprisBlock struct {
 }
 
 func NewMprisBlock() I3barBlocklet {
-	return &MprisBlock{}
+	b := MprisBlock{}
+	b.PlayerFormat = NewConfigFormatFromString("{icon$}{title^10}")
+	b.Icons = make(map[playbackStatus]string)
+	return &b
 }
 
 func (s *MprisBlock) GetConfig() interface{} {
 	return &s.MprisBlockConfig
-}
-
-func (s *MprisBlock) AddPlayer(name string) {
 }
 
 const mprisPath dbus.ObjectPath = "/org/mpris/MediaPlayer2"
@@ -71,6 +74,16 @@ func (b *MprisBlock) fetchPlayers() (err error) {
 }
 
 func (b *MprisBlock) Run(ch UpdateChan, ctx context.Context) {
+	if _, ok := b.Icons[playbackStatusPaused]; !ok {
+		b.Icons[playbackStatusPaused] = " "
+	}
+	if _, ok := b.Icons[playbackStatusPlaying]; !ok {
+		b.Icons[playbackStatusPlaying] = " "
+	}
+	if _, ok := b.Icons[playbackStatusStopped]; !ok {
+		b.Icons[playbackStatusStopped] = " "
+	}
+
 	var err error
 	b.dbus, err = dbus.ConnectSessionBus()
 	if err != nil {
@@ -115,7 +128,8 @@ func (b *MprisBlock) Run(ch UpdateChan, ctx context.Context) {
 				shouldUpdate := false
 				for i := range b.players {
 					player = &b.players[i]
-					if player.dbusName == sig.Sender || player.nameOwner == sig.Sender {
+					if player.dbusName == sig.Sender ||
+						player.nameOwner == sig.Sender {
 						break
 					}
 				}
@@ -139,29 +153,27 @@ func (b *MprisBlock) Run(ch UpdateChan, ctx context.Context) {
 			return
 		}
 	}
-
 }
 
 func (t *MprisBlock) OnEvent(e *I3barClickEvent, ctx context.Context) {
 }
 
-func (t *MprisBlock) Render(cfg *AppConfig) []I3barBlock {
-	s := make([]string, 0)
-	for _, pl := range t.players {
-		var icon string
-		switch pl.playbackStatus {
-		case playbackStatusPaused:
-			icon = " "
-		case playbackStatusPlaying:
-			icon = " "
-		case playbackStatusStopped:
-			icon = " "
-		}
-		s = append(s, fmt.Sprintf("%s[%s]", icon, pl.metadata["xesam:title"]))
+func (b *MprisBlock) Render(cfg *AppConfig) []I3barBlock {
+	if len(b.players) == 0 {
+		return nil
 	}
-	return []I3barBlock{{
-		FullText: strings.Join(s, " | "),
-	}}
+	parts := make([]string, len(b.players))
+	for i, pl := range b.players {
+		var title string
+		if titleVar, ok := pl.metadata["xesam:title"]; ok {
+			titleVar.Store(&title)
+		}
+		parts[i] = b.PlayerFormat.Expand(formatting.NamedArgs{
+			"icon":  b.Icons[pl.playbackStatus],
+			"title": title,
+		})
+	}
+	return []I3barBlock{{FullText: strings.Join(parts, b.Separator)}}
 }
 
 func init() {
