@@ -12,18 +12,28 @@ import (
 	. "github.com/kraftwerk28/gost/core"
 )
 
-type ShellBlockConfig struct {
-	Command        string          `yaml:"command"`
-	OnClickCommand *string         `yaml:"on_click"`
-	Interval       *ConfigInterval `yaml:"interval"`
-	RestartOnExit  bool            `yaml:"restart_on_exit"`
-	Json           bool            `yaml:"json"`
-}
-
 type ShellBlock struct {
 	ShellBlockConfig
 	lastText string
+	cmd      *exec.Cmd
 	log      *log.Logger
+}
+
+// Displays output for a shell script
+// It has three modes:
+// - run script every N seconds, wait for it to exit
+// - run script once, read lines from it's stdout
+//   and update the blocklet per each line
+// - run script in a loop as soon as it exits
+type ShellBlockConfig struct {
+	// Shell command to run
+	Command string `yaml:"command"`
+	// Shell command to run when a blocklet is clicked
+	OnClickCommand *string         `yaml:"on_click"`
+	Interval       *ConfigInterval `yaml:"interval"`
+	RestartOnExit  bool            `yaml:"restart_on_exit"`
+	// Treat command's output as json instead of plain text
+	Json bool `yaml:"json"`
 }
 
 func NewShellBlock() I3barBlocklet {
@@ -43,10 +53,23 @@ func processCmdOutput(o []byte) string {
 }
 
 func (t *ShellBlock) Run(ch UpdateChan, ctx context.Context) {
+	time.Sleep(time.Second)
+
+	// go func() {
+	// 	<- ctx.Done()
+	// 	if t.cmd != nil {
+	// 		t.cmd.Process.Kill()
+	// 	}
+	// }()
 	if t.RestartOnExit {
 		for {
 			cmd := t.newCmd(ctx)
 			outp, err := cmd.Output()
+			if err, ok := err.(*exec.ExitError); ok {
+			} else if err != nil {
+			} else {
+			}
+
 			if err != nil {
 				Log.Print(err)
 			} else {

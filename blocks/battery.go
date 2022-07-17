@@ -27,8 +27,18 @@ const (
 	deviceTypeKeyboard uint32 = 6
 )
 
+// Display battery charge level. Requires UPower to work over DBus
+// `upower_device` can be obtained via DBus using the following command:
+// ```bash
+// $ busctl --json=pretty --system call org.freedesktop.UPower \
+//   /org/freedesktop/UPower org.freedesktop.UPower \
+//   EnumerateDevices \
+//   | jq -r '.data[0] | map(match("[^/]+$").string)[]'`
+// ```
+// If empty, the program will try to detect battery device.
 type BatteryBlockConfig struct {
 	Format       *ConfigFormat     `yaml:"format"`
+	// Device name. See above. 
 	UpowerDevice string            `yaml:"upower_device"`
 	StateIcons   map[string]string `yaml:"state_icons"`
 	LevelIcons   []string          `yaml:"level_icons"`

@@ -11,6 +11,8 @@ import (
 	"github.com/kraftwerk28/gost/core/formatting"
 )
 
+// Displays current keyboard layout.
+// Uses sway's IPC API for retrieving the info (i.e. won't work with i3wm)
 type SwayLayoutConfig struct {
 	Format *ConfigFormat `yaml:"format"`
 	Input  *string       `yaml:"input"`

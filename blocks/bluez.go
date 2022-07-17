@@ -11,10 +11,13 @@ import (
 
 type bluezObjectManagerOutput map[dbus.ObjectPath](map[string](map[string]dbus.Variant))
 
+// Displays connected bluetooth devices
 type BluezBlockConfig struct {
 	BaseBlockletConfig `yaml:",inline"`
+	// Mac address of the device
 	Device             string            `yaml:"mac"`
 	Format             *ConfigFormat     `yaml:"format"`
+	// Device format
 	DeviceFormat       *ConfigFormat     `yaml:"device_format"`
 	Icons              map[string]string `yaml:"icons"`
 	ExcludeMac         []string          `yaml:"exclude"`
