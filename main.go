@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -62,19 +61,21 @@ func readEvents(ch chan *core.I3barClickEvent) {
 	}
 }
 
+var isFirstFrame = true
+
 func feedBlocks(o io.Writer, blocks []core.I3barBlock) (err error) {
-	buf := new(bytes.Buffer)
-	e := json.NewEncoder(buf)
+	if isFirstFrame {
+		isFirstFrame = false
+	} else {
+		if _, err = os.Stdout.WriteString(","); err != nil {
+			return
+		}
+	}
+	e := json.NewEncoder(os.Stdout)
 	e.SetEscapeHTML(false)
 	if err = e.Encode(blocks); err != nil {
 		return
 	}
-	if err = buf.WriteByte('\n'); err != nil {
-		return
-	}
-	b := buf.Bytes()
-	b[len(b)-2] = ','
-	_, err = os.Stdout.Write(b)
 	return
 }
 

@@ -133,7 +133,6 @@ func (t *BluezBlock) Run(ch UpdateChan, ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case s := <-c:
-			Log.Printf("[bluez] %+v\n", s)
 			switch s.Name {
 			case "org.freedesktop.DBus.ObjectManager.InterfaceAdded",
 				"org.freedesktop.DBus.ObjectManager.InterfaceRemoved":
