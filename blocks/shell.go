@@ -45,24 +45,8 @@ func (s *ShellBlock) GetConfig() interface{} {
 	return &s.ShellBlockConfig
 }
 
-type ShellCmd struct {
-	*exec.Cmd
-	stdout, stderr bytes.Buffer
-}
-
 func (t *ShellBlock) newCmd(ctx context.Context) *exec.Cmd {
 	return exec.CommandContext(ctx, "sh", "-c", t.Command)
-}
-
-func (s *ShellCmd) Exec() (stdout, stderr []byte, exitErr *exec.ExitError) {
-	err := s.Run()
-	if err != nil {
-		if casted, ok := err.(*exec.ExitError); ok {
-			return nil, s.stderr.Bytes(), casted
-		}
-		return nil, nil, nil
-	}
-	return s.stdout.Bytes(), nil, nil
 }
 
 func processCmdOutput(o []byte) string {
