@@ -19,17 +19,18 @@ func NewIpcClient() (*IpcClient, error) {
 	return &IpcClient{conn: l}, nil
 }
 
-func (s *IpcClient) Recv() (IpcMsgType, interface{}, error) {
+func (s *IpcClient) Recv() (messageType IpcMsgType, out interface{}, err error) {
 	resHeader := &IpcHeader{}
-	if err := binary.Read(s.conn, binary.LittleEndian, resHeader); err != nil {
+	if err = binary.Read(s.conn, binary.LittleEndian, resHeader); err != nil {
 		return IpcMsgTypeInvalid, nil, err
 	}
 	resBody := make([]byte, resHeader.Len)
 	if err := binary.Read(s.conn, binary.LittleEndian, resBody); err != nil {
 		return IpcMsgTypeInvalid, nil, err
 	}
-	var out interface{}
 	if resHeader.Typ&0x80000000 != 0 {
+		// This is an event
+		// TODO: consider more events from protocol
 		resHeader.Typ &= 0x7fffffff
 		switch resHeader.Typ {
 		case IpcEventTypeInput:
@@ -38,6 +39,7 @@ func (s *IpcClient) Recv() (IpcMsgType, interface{}, error) {
 			out = &WindowChange{}
 		}
 	} else {
+		// This is a response to a call
 		switch resHeader.Typ {
 		case IpcMsgTypeGetInputs:
 			out = &[]IpcInputDevice{}
@@ -47,7 +49,10 @@ func (s *IpcClient) Recv() (IpcMsgType, interface{}, error) {
 			out = &IpcCmdResult{}
 		}
 	}
-	if err := json.Unmarshal(resBody, out); err != nil {
+	if out == nil {
+		return IpcMsgTypeInvalid, nil, nil
+	}
+	if err = json.Unmarshal(resBody, out); err != nil {
 		return IpcMsgTypeInvalid, nil, err
 	}
 	return resHeader.Typ, out, nil

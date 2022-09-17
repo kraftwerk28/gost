@@ -45,34 +45,45 @@ func (s *SwayLayout) processDevice(device *ipc.IpcInputDevice) bool {
 
 func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 	s.layoutLongToShort = rxkbcommon.GetLayoutShortNames()
-	ipcClient, _ := ipc.NewIpcClient()
+
+	ipcClient, err := ipc.NewIpcClient()
+	// s.ipc, err := ipc.NewIpcClient()
+	if err != nil {
+		return
+	}
 	defer ipcClient.Close()
+	s.ipc = ipcClient
+
+	var swayInputs interface{}
+	var msgType ipc.IpcMsgType
+	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)
+	msgType, swayInputs, err = ipcClient.Recv()
+	if err != nil {
+		Log.Print(err)
+		return
+	}
+	if msgType != ipc.IpcMsgTypeGetInputs {
+		Log.Println("Invalid IPC response")
+		return
+	}
+	for _, dev := range *swayInputs.(*[]ipc.IpcInputDevice) {
+		if s.processDevice(&dev) {
+			break
+		}
+	}
+
+	ipcClient.Send(ipc.IpcMsgTypeSubscribe, []string{"input"})
+	if msgType, _, err = ipcClient.Recv(); err != nil {
+		return
+	}
+
+	ch.SendUpdate()
+
 	type IpcChanValue struct {
 		typ     ipc.IpcMsgType
 		payload interface{}
 	}
 	evc := make(chan IpcChanValue)
-	s.ipc = ipcClient
-	var err error
-	var res interface{}
-	ipcClient.SendRaw(ipc.IpcMsgTypeGetInputs, nil)
-	_, res, err = ipcClient.Recv()
-	if err != nil {
-		Log.Print(err)
-		return
-	}
-	for _, dev := range *res.(*[]ipc.IpcInputDevice) {
-		if s.processDevice(&dev) {
-			break
-		}
-	}
-	ipcClient.SendRaw(ipc.IpcMsgTypeSubscribe, []byte(`["input"]`))
-	if _, _, err = ipcClient.Recv(); err != nil {
-		return
-	}
-	const throttleDuration = time.Millisecond * 50
-	throttleTimer := time.NewTimer(throttleDuration)
-	ch.SendUpdate()
 	go func() {
 		for {
 			if t, d, err := ipcClient.Recv(); err == nil {
@@ -82,13 +93,15 @@ func (s *SwayLayout) Run(ch UpdateChan, ctx context.Context) {
 			}
 		}
 	}()
+	throttleTimer := time.NewTimer(time.Millisecond * 50)
 	for {
 		select {
 		case <-throttleTimer.C:
 			ch.SendUpdate()
 		case e := <-evc:
 			throttleTimer.Reset(throttleDuration)
-			if e.typ == ipc.IpcEventTypeInput {
+			switch e.typ {
+			case ipc.IpcEventTypeInput:
 				device := e.payload.(*ipc.InputChange).Input
 				s.processDevice(&device)
 			}

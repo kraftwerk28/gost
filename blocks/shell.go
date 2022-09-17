@@ -41,7 +41,7 @@ func NewShellBlock() I3barBlocklet {
 	return &ShellBlock{}
 }
 
-func (s *ShellBlock) GetConfig() interface{} {
+func (s *ShellBlock) GetConfig() any {
 	return &s.ShellBlockConfig
 }
 
