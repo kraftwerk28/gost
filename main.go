@@ -136,7 +136,7 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(
 		signalChan,
-		syscall.SIGUSR2,                 // reload config
+		syscall.SIGHUP,                  // reload config
 		syscall.SIGTERM, syscall.SIGINT, // exit
 	)
 
@@ -217,7 +217,7 @@ outerLoop:
 				}
 			case signal := <-signalChan:
 				switch signal {
-				case syscall.SIGUSR2:
+				case syscall.SIGHUP:
 					log.Println("Waiting for blocklets to stop")
 					if !stopWithTimeout(ctxCancel, &wg) {
 						log.Println("Blocklets failed to stop")
