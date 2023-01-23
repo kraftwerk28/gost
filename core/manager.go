@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os/exec"
 	"strings"
 	"sync"
 )
@@ -122,10 +121,8 @@ func (bm *BlockletMgr) ProcessEvent(
 	if cfg := bm.getBaseConfig(); cfg != nil {
 		if cfg.OnClick != nil {
 			cmd := e.ShellCommand(*cfg.OnClick, ctx)
-			cmd.Start()
-			cerr := cmd.Run()
-			if err, ok := cerr.(*exec.ExitError); ok {
-				Log.Printf("%s\n", err.Stderr)
+			if err := cmd.Run(); err != nil {
+				Log.Print(err)
 			}
 		}
 	}

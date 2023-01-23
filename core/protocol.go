@@ -72,16 +72,18 @@ func (e *I3barClickEvent) CustomBlockletName() string {
 func (e *I3barClickEvent) ShellCommand(
 	command string,
 	ctx context.Context,
-) (cmd *exec.Cmd) {
-	cmd = exec.CommandContext(ctx, "sh", "-c", command)
+) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(
-		os.Environ(),
+		cmd.Env,
 		fmt.Sprintf("BUTTON=%s", e.Button.String()),
 		fmt.Sprintf("X=%d", e.X),
 		fmt.Sprintf("Y=%d", e.Y),
 	)
 	cmd.Stdout = Log.Writer()
-	return
+	cmd.Stderr = Log.Writer()
+	return cmd
 }
 
 func NewEventFromRaw(raw []byte) (*I3barClickEvent, error) {
