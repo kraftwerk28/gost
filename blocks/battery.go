@@ -30,15 +30,17 @@ const (
 // Display battery charge level. Requires UPower to work over DBus
 // `upower_device` can be obtained via DBus using the following command:
 // ```bash
-// $ busctl --json=pretty --system call org.freedesktop.UPower \
-//   /org/freedesktop/UPower org.freedesktop.UPower \
-//   EnumerateDevices \
-//   | jq -r '.data[0] | map(match("[^/]+$").string)[]'`
+//
+//	$ busctl --json=pretty --system call org.freedesktop.UPower \
+//	  /org/freedesktop/UPower org.freedesktop.UPower \
+//	  EnumerateDevices \
+//	  | jq -r '.data[0] | map(match("[^/]+$").string)[]'`
+//
 // ```
 // If empty, the program will try to detect battery device.
 type BatteryBlockConfig struct {
-	Format       *ConfigFormat     `yaml:"format"`
-	// Device name. See above. 
+	Format *ConfigFormat `yaml:"format"`
+	// Device name. See above.
 	UpowerDevice string            `yaml:"upower_device"`
 	StateIcons   map[string]string `yaml:"state_icons"`
 	LevelIcons   []string          `yaml:"level_icons"`
@@ -108,16 +110,14 @@ func (t *BatteryBlock) getStateIcon() string {
 	}
 }
 
-func (t *BatteryBlock) listDevices(ctx context.Context) (r []dbus.ObjectPath, e error) {
-	e = t.dbusConn.Object(
-		upowerDbusDest, upowerDbusBasePath,
-	).CallWithContext(
-		ctx, "org.freedesktop.UPower.EnumerateDevices", 0,
-	).Store(&r)
-	if e != nil {
+func (t *BatteryBlock) listDevices(ctx context.Context) ([]dbus.ObjectPath, error) {
+	var paths []dbus.ObjectPath
+	o := t.dbusConn.Object(upowerDbusDest, upowerDbusBasePath)
+	if err := o.CallWithContext(ctx, "org.freedesktop.UPower.EnumerateDevices", 0).Store(&paths); err != nil {
 		Log.Println("Failed to get list")
+		return nil, err
 	}
-	return
+	return paths, nil
 }
 
 func (t *BatteryBlock) findLaptopBattery(ctx context.Context) (p dbus.ObjectPath, e error) {
@@ -127,13 +127,8 @@ func (t *BatteryBlock) findLaptopBattery(ctx context.Context) (p dbus.ObjectPath
 	}
 	for _, oPath := range devices {
 		var devType uint32
-		e = t.dbusConn.Object(
-			upowerDbusDest, oPath,
-		).CallWithContext(
-			ctx, dbusGetProperty, 0,
-			upowerDbusDest+".Device", "Type",
-		).Store(&devType)
-		if e != nil {
+		o := t.dbusConn.Object(upowerDbusDest, oPath)
+		if err := o.CallWithContext(ctx, dbusGetProperty, 0, upowerDbusDest+".Device", "Type").Store(&devType); err != nil {
 			return
 		}
 		if devType == deviceTypeBattery {

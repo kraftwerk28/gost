@@ -108,6 +108,9 @@ func (c *NmIp4Config) loadProps(conn *dbus.Conn) (err error) {
 	if err = dbusGetProp(o, nmDbusDest+".IP4Config", "Addresses", &ipv4Addresses); err != nil {
 		return
 	}
+	if len(ipv4Addresses) < 1 || len(ipv4Addresses[0]) < 1 {
+		return
+	}
 	c.ip = make(net.IP, 4)
 	binary.BigEndian.PutUint32(c.ip, ipv4Addresses[0][0])
 	return
@@ -141,7 +144,7 @@ type NetworkManagerBlock struct {
 	state                  nmState
 }
 
-func NewNetworkManagerBlock() I3barBlocklet {
+func newNetworkManagerBlock() I3barBlocklet {
 	b := NetworkManagerBlock{}
 	b.Format = NewConfigFormatFromString("{state_icon$}{percentage*%}")
 	b.AccessPointFormat = NewConfigFormatFromString("{strength:3*%$}{ssid}")
@@ -209,6 +212,16 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 		Log.Print(err)
 		return
 	}
+	for _, signalName := range []string{"StateChanged", "DeviceAdded", "DeviceRemoved"} {
+		if err = conn.AddMatchSignal(
+			dbus.WithMatchPathNamespace(nmDbusBasePath),
+			dbus.WithMatchInterface(nmDbusDest),
+			dbus.WithMatchMember(signalName),
+		); err != nil {
+			Log.Print(err)
+			return
+		}
+	}
 	if err := t.loadConnections(); err != nil {
 		// Don't fail
 		Log.Print(err)
@@ -270,6 +283,9 @@ func (t *NetworkManagerBlock) Run(ch UpdateChan, ctx context.Context) {
 					if st, ok := changedProps["Addresses"]; ok {
 						var ipv4Addresses [][]uint32
 						st.Store(&ipv4Addresses)
+						if len(ipv4Addresses) < 1 || len(ipv4Addresses[0]) < 1 {
+							return
+						}
 						binary.BigEndian.PutUint32(
 							conn.ip4Config.ip,
 							ipv4Addresses[0][0],
@@ -369,5 +385,5 @@ func (b *NetworkManagerBlock) Render(cfg *AppConfig) []I3barBlock {
 }
 
 func init() {
-	RegisterBlocklet("networkmanager", NewNetworkManagerBlock)
+	RegisterBlocklet("networkmanager", newNetworkManagerBlock)
 }
